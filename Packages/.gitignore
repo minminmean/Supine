@@ -2,3 +2,7 @@
 
 # Change this to match your new package name
 !minminmean.supine*
+minminmean.supine/Runtime/Supine/Generated
+minminmean.supine/Runtime/Supine/Generated.meta
+packages-lock.json
+vpm-manifest.json
