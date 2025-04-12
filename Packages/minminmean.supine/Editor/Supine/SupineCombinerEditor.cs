@@ -1,12 +1,6 @@
 using UnityEngine;
 using UnityEditor;
-using UnityEditor.Animations;
-using static VRC.SDK3.Avatars.Components.VRCAvatarDescriptor;
-using VRC.SDK3.Avatars.Components;
 using System.IO;
-using VRC.SDK3.Avatars.ScriptableObjects;
-using static VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionsMenu.Control;
-using System.Reflection;
 using Supine;
 
 public class SupineCombinerEditor : EditorWindow
@@ -97,7 +91,7 @@ public class SupineCombinerEditor : EditorWindow
             {
                 if (GUILayout.Button(localizeDict.check))
                 {
-                    supineCombiner = new SupineCombiner(avatar);
+                    supineCombiner = InstantiateCombiner(avatar);
                     if (supineCombiner.canCombine)
                     {
                         _canCombine = true;
@@ -109,11 +103,6 @@ public class SupineCombinerEditor : EditorWindow
                         _canCombine = false;
                         EditorUtility.DisplayDialog(localizeDict.check_failure, localizeDict.check_failure_message, "OK");
                         Debug.Log("[VRCSupine] Check failed.");
-                    }
-
-                    if (supineCombiner.alreadyCombined)
-                    {
-                        EditorUtility.DisplayDialog(localizeDict.already_combined, localizeDict.already_combined_message, "OK");
                     }
                 }
             }
@@ -145,5 +134,10 @@ public class SupineCombinerEditor : EditorWindow
             }
 
         }
+    }
+
+    protected virtual SupineCombiner InstantiateCombiner(GameObject avatar)
+    {
+        return new SupineCombiner(avatar);
     }
 }

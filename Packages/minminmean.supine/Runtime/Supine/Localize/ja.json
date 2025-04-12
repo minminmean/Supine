@@ -15,8 +15,6 @@
     "check_successful_message": "検証に成功しました。\rMA Prefabを生成ボタンを押すとごろ寝システムPrefabを生成します。",
     "check_failure": "検証失敗",
     "check_failure_message": "ごろ寝システムを結合できません。",
-    "already_combined": "結合済み",
-    "already_combined_message": "既にごろ寝システム結合済みファイルが生成されています。\r生成ボタンを押すと新たに生成し直します。",
     "combine_successful": "結合成功",
     "combine_successful_message": "結合に成功しました。",
     "combine_failure": "結合失敗",
@@ -26,5 +24,5 @@
     "ma_prefab_created_message": "Modular Avatar Prefabを生成しました。",
     "ma_prefab_create_failure": "Prefab生成失敗",
     "ma_prefab_create_failure_message": "Modular Avatar Prefabの生成に失敗しました。",
-    "clean_combined_supine": "結合済みのごろ寝システムを削除する"
+    "clean_combined_supine": "古いごろ寝システム（v3.x以前）を削除する"
 }

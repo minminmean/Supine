@@ -18,8 +18,6 @@ namespace Supine
         public string check_successful_message;
         public string check_failure;
         public string check_failure_message;
-        public string already_combined;
-        public string already_combined_message;
         public string combine_successful;
         public string combine_successful_message;
         public string combine_failure;

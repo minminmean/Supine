@@ -1,13 +1,10 @@
 using System.IO;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.Animations;
-using static VRC.SDK3.Avatars.Components.VRCAvatarDescriptor;
 using VRC.SDK3.Avatars.Components;
-using VRC.SDK3.Avatars.ScriptableObjects;
 
 using ExpressionsMenu = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionsMenu;
 using ExpressionsMenuControl = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionsMenu.Control;
@@ -27,9 +24,9 @@ public class SupineCombiner
     private VRCAvatarDescriptor _avatarDescriptor;
     public bool canCombine = true;
     public bool alreadyCombined = false;
+    public bool otherSupinePrefabPlaced = false;
 
     private string _supineDirGuid = "2d76018424e030f4597625fa4cdb0d28";
-    private string _templatesGuid = "ea86c0575ff5d3349b795b2be287edb4";
     private string _maPrefabGuid = "f0776ab98fcb1bd4fbb991a3fb0f3d54";
     private string _animatorGuid = "54574f02780fe18449d0bdf9e17bee7d";
     private string[] _sittingAnimationGuids =
@@ -76,10 +73,16 @@ public class SupineCombiner
         {
             //  すでに組込済みの場合、(アバター名)_(数字)で作れるようになるまでループ回す
             alreadyCombined = true;
-            Debug.Log("[VRCSupine] Directory already exists.");
+            Debug.Log("[VRCSupine] Directory already exists. Try to create new directory.");
             int suffix;
             for (suffix=1; hasGeneratedFiles(suffix); suffix++);
             _avatar_name = _avatar_name + "_" + suffix.ToString();
+        }
+
+        if (FindOtherSupinePrefab())
+        {
+            otherSupinePrefabPlaced = true;
+            Debug.Log("[VRCSupine] Detect other supine prefab. Will replace by new prefab.");
         }
     }
 
@@ -98,7 +101,7 @@ public class SupineCombiner
         if (canCombine)
         {
             // Locomotionを組む
-            var supineLocomotion = CopyAssetFromGuid<AnimatorController>(_animatorGuid);
+            var supineLocomotion = GetTemplateController();
 
             if (shouldInheritOriginalAnimation)
             {
@@ -112,25 +115,16 @@ public class SupineCombiner
 
             Debug.Log("[VRCSupine] Created the directory '" + generatedDirectory() + "'.");
 
-            // 既に設置済みのMA Prefabを検知しておく
-            var createdPrefab = GameObject.Find("SupineMA");
-
-            // MA Prefabを生成 & アニメーターを差し替え
-            var maPrefabPath = AssetDatabase.GUIDToAssetPath(_maPrefabGuid);
-            var maPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(maPrefabPath);
+            var maPrefab = GetMAPrefab();
+            var createdPrefab = GameObject.Find(maPrefab.name);
             var maGameObj = PrefabUtility.InstantiatePrefab(maPrefab, _avatar.transform) as GameObject;
             var component = maGameObj.GetComponents<ModularAvatarMergeAnimator>()[0];
             component.animator = supineLocomotion;
 
             EditorUtility.SetDirty(component);
 
-            // 設置済みのMA Prefabを削除
-            if (createdPrefab != null)
-            {
-                int createdPrefabIndex = createdPrefab.transform.GetSiblingIndex();
-                maGameObj.transform.SetSiblingIndex(createdPrefabIndex);
-                GameObject.DestroyImmediate(createdPrefab);
-            }
+            // 設置済みのMAPrefabを整理
+            SortAndCleanMAPrefab(maGameObj, createdPrefab);
 
             // 結合済みのごろ寝システムを削除
             if (shouldCleanCombinedSupine) {
@@ -141,6 +135,46 @@ public class SupineCombiner
         } else {
             Debug.LogError("[VRCSupine] Could not create MA Prefab.");
         }
+    }
+
+    protected virtual AnimatorController GetTemplateController()
+    {
+        return CopyAssetFromGuid<AnimatorController>(_animatorGuid);
+    }
+
+    protected virtual GameObject GetMAPrefab()
+    {
+        string maPrefabPath = AssetDatabase.GUIDToAssetPath(_maPrefabGuid);
+        return AssetDatabase.LoadAssetAtPath<GameObject>(maPrefabPath);
+    }
+
+    private void SortAndCleanMAPrefab(GameObject newPrefab, GameObject oldPrefab)
+    {
+        bool indexReplaced = false;
+        if (oldPrefab != null)
+        {
+            int createdPrefabIndex = oldPrefab.transform.GetSiblingIndex();
+            newPrefab.transform.SetSiblingIndex(createdPrefabIndex);
+            GameObject.DestroyImmediate(oldPrefab);
+            indexReplaced = true;
+        }
+
+        GameObject otherSupinePrefab = FindOtherSupinePrefab();
+        if (otherSupinePrefab)
+        {
+            if (!indexReplaced)
+            {
+                int otherSupinePrefabIndex = otherSupinePrefab.transform.GetSiblingIndex();
+                newPrefab.transform.SetSiblingIndex(otherSupinePrefabIndex);
+            }
+
+            GameObject.DestroyImmediate(otherSupinePrefab);
+        }
+    }
+
+    protected virtual GameObject FindOtherSupinePrefab()
+    {
+        return GameObject.Find("SupineMA_EX");
     }
 
     private AnimatorController InheritOriginalAnimation(AnimatorController supineLocomotion, AnimatorController originalLocomotion)
@@ -208,7 +242,7 @@ public class SupineCombiner
 
         return supineLocomotion;
     }
-    private T CopyAssetFromGuid<T>(string guid) where T : Object
+    protected T CopyAssetFromGuid<T>(string guid) where T : Object
     {
         string templatePath = AssetDatabase.GUIDToAssetPath(guid);
         string templateName = Path.GetFileName(templatePath);
@@ -280,8 +314,6 @@ public class SupineCombiner
 
         // 変更を適用
         descriptorObj.ApplyModifiedProperties();
-
-        Debug.Log("test");
     }
 
     private List<ExpressionsMenuControl> RemoveCombinedExMenuControls(List<ExpressionsMenuControl> exMenuControls)
