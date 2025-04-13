@@ -301,10 +301,9 @@ public class SupineCombiner
         return AssetDatabase.IsValidFolder(MakeGeneratedDirPath(suffix));
     }
 
-    private string GetAppVersion()
+    protected virtual string GetAppVersion()
     {
-        string path = AssetDatabase.GUIDToAssetPath(_appVersionTextGuid);
-        return File.ReadAllText(path);
+        return File.ReadAllText(AssetDatabase.GUIDToAssetPath(_appVersionTextGuid));
     }
 
     private void CleanCombinedSupine()
