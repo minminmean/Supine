@@ -12,9 +12,9 @@
     "agura": "Cross-legged",
     "avatar": "Avatar",
     "check_successful": "Check successful",
-    "check_successful_message": "Check is successful.\rThen click Create MA Prefab button to execute combine.",
+    "check_successful_message": "Check is successful.\nThen click Create button to create and place MA Prefab.",
     "check_failure": "Check failure",
-    "check_failure_message": "Cannot combine.",
+    "check_failure_message": "Cannot combine.\nThis is not avatar object.",
     "combine_successful": "Combine successful",
     "combine_successful_message": "Combined!",
     "combine_failure": "Combine failure",
@@ -23,6 +23,6 @@
     "ma_prefab_created": "Prefab creation successful",
     "ma_prefab_created_message": "Created the Modular Avatar Prefab.",
     "ma_prefab_create_failure": "Prefab creation failure",
-    "ma_prefab_create_failure_message": "Modular Avatar Prefab creation is failure.",
+    "ma_prefab_create_failure_message": "Modular Avatar Prefab creation is failure.\nPlease check the console log.",
     "clean_combined_supine": "Clean old Supine (Lower v3.x)"
 }

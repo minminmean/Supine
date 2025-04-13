@@ -12,9 +12,9 @@
     "agura": "あぐら",
     "avatar": "アバター",
     "check_successful": "検証成功",
-    "check_successful_message": "検証に成功しました。\rMA Prefabを生成ボタンを押すとごろ寝システムPrefabを生成します。",
+    "check_successful_message": "検証に成功しました。\n生成ボタンを押すと組込を行います。",
     "check_failure": "検証失敗",
-    "check_failure_message": "ごろ寝システムを結合できません。",
+    "check_failure_message": "ごろ寝システムを組込できません。\nアバターではありません。",
     "combine_successful": "結合成功",
     "combine_successful_message": "結合に成功しました。",
     "combine_failure": "結合失敗",
@@ -23,6 +23,6 @@
     "ma_prefab_created": "Prefab生成成功",
     "ma_prefab_created_message": "Modular Avatar Prefabを生成しました。",
     "ma_prefab_create_failure": "Prefab生成失敗",
-    "ma_prefab_create_failure_message": "Modular Avatar Prefabの生成に失敗しました。",
+    "ma_prefab_create_failure_message": "Modular Avatar Prefabの生成に失敗しました。\nコンソールログを確認してください。",
     "clean_combined_supine": "古いごろ寝システム（v3.x以前）を削除する"
 }
