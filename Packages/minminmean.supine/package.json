@@ -1,7 +1,7 @@
 {
   "name": "minminmean.supine",
   "displayName": "Gorone System (Supine)",
-  "version": "4.2.2",
+  "version": "4.2.3",
   "description": "Have a good sleep",
   "gitDependencies": {},
   "vpmDependencies": {
@@ -13,8 +13,8 @@
     "email": "duralumin0221@gmail.com",
     "url": "https://github.com/minminmean"
   },
-  "legacyFolders": {},
-  "legacyFiles": {},
-  "localPath": "",
+  "legacyFolders": {
+    "Assets\\MinMinMart": "76952c3cbc2ccee41a286a59af040b88"
+  },
   "unity": "2022.3"
 }
