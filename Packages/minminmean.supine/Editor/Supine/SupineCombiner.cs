@@ -26,7 +26,8 @@ public class SupineCombiner
     public bool alreadyCombined = false;
     public bool otherSupinePrefabPlaced = false;
 
-    private string _supineDirGuid = "2d76018424e030f4597625fa4cdb0d28";
+    private string _mmmAssetsPath = "Assets/MinMinMart";
+    private string _appVersionTextGuid = "71c4325af3f46224cafbab56dd5824b1";
     private string _maPrefabGuid = "f0776ab98fcb1bd4fbb991a3fb0f3d54";
     private string _animatorGuid = "54574f02780fe18449d0bdf9e17bee7d";
     private string[] _sittingAnimationGuids =
@@ -69,13 +70,13 @@ public class SupineCombiner
             Debug.LogError("[VRCSupine] Could not find VRCAvatarDescriptor.");
             canCombine = false;
         }
-        else if (hasGeneratedFiles())
+        else if (HasGeneratedFiles())
         {
             //  すでに組込済みの場合、(アバター名)_(数字)で作れるようになるまでループ回す
             alreadyCombined = true;
             Debug.Log("[VRCSupine] Directory already exists. Try to create new directory.");
             int suffix;
-            for (suffix=1; hasGeneratedFiles(suffix); suffix++);
+            for (suffix=1; HasGeneratedFiles(suffix); suffix++);
             _avatar_name = _avatar_name + "_" + suffix.ToString();
         }
 
@@ -113,7 +114,7 @@ public class SupineCombiner
 
             SetSittingAnimations(supineLocomotion, sittingPoseOrder1, sittingPoseOrder2);
 
-            Debug.Log("[VRCSupine] Created the directory '" + generatedDirectory() + "'.");
+            Debug.Log("[VRCSupine] Created the directory '" + MakeGeneratedDirPath() + "'.");
 
             var maPrefab = GetMAPrefab();
             var createdPrefab = GameObject.Find(maPrefab.name);
@@ -242,15 +243,16 @@ public class SupineCombiner
 
         return supineLocomotion;
     }
+
     protected T CopyAssetFromGuid<T>(string guid) where T : Object
     {
         string templatePath = AssetDatabase.GUIDToAssetPath(guid);
         string templateName = Path.GetFileName(templatePath);
-        string generatedPath = generatedDirectory() + "/" + _avatar_name + "_" + templateName;
+        string generatedPath = MakeGeneratedDirPath() + "/" + _avatar_name + "_" + templateName;
 
-        if (!Directory.Exists(generatedDirectory()))
+        if (!Directory.Exists(MakeGeneratedDirPath()))
         {
-            Directory.CreateDirectory(generatedDirectory());
+            CreateFolderRecursively(MakeGeneratedDirPath());
         }
 
         if (!AssetDatabase.CopyAsset(templatePath, generatedPath))
@@ -262,21 +264,47 @@ public class SupineCombiner
         return AssetDatabase.LoadAssetAtPath<T>(generatedPath);
     }
 
-    private string generatedDirectory(int suffix = 0)
+    private void CreateFolderRecursively(string path)
     {
-        string generatedDirPath = AssetDatabase.GUIDToAssetPath(_supineDirGuid) + "/Generated/";
-        if (suffix > 0) {
-            return generatedDirPath + _avatar_name + "_" + suffix.ToString();
-        }
-        else
+        if (!path.StartsWith("Assets/"))
         {
-            return generatedDirPath + _avatar_name;
+            Debug.LogError("[VRCSupine] Could not create directory: (" + path + ") this is not in Assets");
+            throw new IOException();
+        }
+
+        var dirs = path.Split('/');
+        var combinePath = dirs[0];
+        foreach (var dir in dirs.Skip(1))
+        {
+            if (!AssetDatabase.IsValidFolder(combinePath + '/' + dir))
+            {
+                AssetDatabase.CreateFolder(combinePath, dir);
+            }
+            combinePath += '/' + dir;
         }
     }
 
-    private bool hasGeneratedFiles(int suffix = 0)
+    private string MakeGeneratedDirPath(int suffix = 0)
     {
-        return AssetDatabase.IsValidFolder(generatedDirectory(suffix));
+        string generatedDirPath = _mmmAssetsPath + '/' + GetAppVersion() + "/Generated";
+        if (suffix > 0) {
+            return generatedDirPath + "/" + _avatar_name + "_" + suffix.ToString();
+        }
+        else
+        {
+            return generatedDirPath + "/" + _avatar_name;
+        }
+    }
+
+    private bool HasGeneratedFiles(int suffix = 0)
+    {
+        return AssetDatabase.IsValidFolder(MakeGeneratedDirPath(suffix));
+    }
+
+    private string GetAppVersion()
+    {
+        string path = AssetDatabase.GUIDToAssetPath(_appVersionTextGuid);
+        return File.ReadAllText(path);
     }
 
     private void CleanCombinedSupine()
