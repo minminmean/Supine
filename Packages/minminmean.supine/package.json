@@ -1,9 +1,8 @@
 {
   "name": "minminmean.supine",
   "displayName": "Gorone System (Supine)",
-  "version": "4.2.0",
+  "version": "4.2.1",
   "description": "Have a good sleep",
-  "dependencies": {},
   "gitDependencies": {},
   "vpmDependencies": {
     "com.vrchat.avatars": ">=3.8.0",
