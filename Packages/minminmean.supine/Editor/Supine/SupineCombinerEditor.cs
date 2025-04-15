@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEditor;
 using System.IO;
 using Supine.Utilities;
-using System.Security.Policy;
 
 namespace Supine
 {
