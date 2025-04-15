@@ -1,0 +1,20 @@
+{
+    "name": "minminmean.supine.Editor.Utilities",
+    "rootNamespace": "",
+    "references": [
+        "GUID:101ae27c3b34f2345838ccc4b38b888d",
+        "GUID:c86df31d861b2904ca0a15e6bb247165",
+        "GUID:fc900867c0f47cd49b6e2ae4ef907300"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

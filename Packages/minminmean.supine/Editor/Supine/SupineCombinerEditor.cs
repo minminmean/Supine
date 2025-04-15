@@ -94,7 +94,7 @@ namespace Supine
                 {
                     if (GUILayout.Button(localizeDict.check))
                     {
-                        supineCombiner = new SupineCombiner(avatar);
+                        supineCombiner = InstantiateCombiner(avatar);
                         if (supineCombiner.canCombine)
                         {
                             _canCombine = true;
@@ -139,9 +139,9 @@ namespace Supine
             }
         }
 
-        // protected virtual SupineCombiner InstantiateCombiner(GameObject avatar)
-        // {
-        //     return new SupineCombiner(avatar);
-        // }
+        protected virtual SupineCombiner InstantiateCombiner(GameObject avatar)
+        {
+            return new SupineCombiner(avatar);
+        }
     }
 }
