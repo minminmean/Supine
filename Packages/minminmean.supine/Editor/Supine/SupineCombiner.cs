@@ -1,388 +1,290 @@
 using System.IO;
-using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.Animations;
 using VRC.SDK3.Avatars.Components;
 
-using ExpressionsMenu = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionsMenu;
-using ExpressionsMenuControl = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionsMenu.Control;
-using ExpressionParameters = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionParameters;
-using ExpressionParameter = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionParameters.Parameter;
-
 using ModularAvatarMergeAnimator = nadena.dev.modular_avatar.core.ModularAvatarMergeAnimator;
+using Supine.Utilities;
 
-/// <summary>
-/// avatarにLocomotion, Menu, Parametersを組み込むクラス
-/// </summary>
-
-public class SupineCombiner
+namespace Supine
 {
-    private GameObject _avatar;
-    private string _avatar_name;
-    private VRCAvatarDescriptor _avatarDescriptor;
-    public bool canCombine = true;
-    public bool alreadyCombined = false;
-    public bool otherSupinePrefabPlaced = false;
 
-    private string _mmmAssetsPath = "Assets/MinMinMart";
-    private string _appVersionTextGuid = "71c4325af3f46224cafbab56dd5824b1";
-    private string _maPrefabGuid = "f0776ab98fcb1bd4fbb991a3fb0f3d54";
-    private string _animatorGuid = "54574f02780fe18449d0bdf9e17bee7d";
-    private string[] _sittingAnimationGuids =
+    /// <summary>
+    /// avatarにごろ寝システムPrefabを設置するためのクラス
+    /// </summary>
+
+    public class SupineCombiner
     {
-        "4de1b4829899b754db2ec3e28014a61e", // ぺたん
-        "8d965ea5d99a8cf40bd517890509b5b2", // 立膝（女）
-        "7763fb4ad4e8be942861867e99e04deb", // あぐら
-        "1e0291513c4de5e4c8c210f788354cba"  // 立膝（男）
-    };
+        private GameObject _avatar;
+        private string _avatar_name_with_suffix;
+        private VRCAvatarDescriptor _avatarDescriptor;
+        private bool _exMode = false;
+        public bool canCombine = true;
 
-    private ExpressionParameter[] _oldSupineParameters = new ExpressionParameter[11]
+        private string MmmAssetPath           = "Assets/MinMinMart";
+        private string SupineNormalPrefabName = "SupineMA";
+        private string SupineExPrefabName     = "SupineMA_EX";
+        private string _maPrefabGuid    = Utility.GuidList.prefabs.normal;
+        private string _controllerGuid  = Utility.GuidList.controllers.normal;
+        private string _appVersion      = Utility.GetAppVersion();
+        private string[] SittingAnimationGuids =
         {
-            new ExpressionParameter { name = "VRCLockPose",                 valueType = ExpressionParameters.ValueType.Int },
-            new ExpressionParameter { name = "VRCFootAnchor",               valueType = ExpressionParameters.ValueType.Int },
-            new ExpressionParameter { name = "VRCMjiTime",                  valueType = ExpressionParameters.ValueType.Float },
-            new ExpressionParameter { name = "VRCKjiTime",                  valueType = ExpressionParameters.ValueType.Float },
-            new ExpressionParameter { name = "VRCSupine",                   valueType = ExpressionParameters.ValueType.Int },
-            new ExpressionParameter { name = "VRCLockPose",                 valueType = ExpressionParameters.ValueType.Bool },
-            new ExpressionParameter { name = "VRCFootAnchor",               valueType = ExpressionParameters.ValueType.Bool },
-            new ExpressionParameter { name = "VRCSupineExAdjust",           valueType = ExpressionParameters.ValueType.Float },
-            new ExpressionParameter { name = "VRCSupineExAdjusting",        valueType = ExpressionParameters.ValueType.Bool },
-            new ExpressionParameter { name = "VRCFootAnchorHandSwitchable", valueType = ExpressionParameters.ValueType.Bool },
-            new ExpressionParameter { name = "VRCSupineAutoRotation",       valueType = ExpressionParameters.ValueType.Bool }
+            Utility.GuidList.animations.sitting.petan,          // ぺたん
+            Utility.GuidList.animations.sitting.tatehiza_girl,  // 立膝（女）
+            Utility.GuidList.animations.sitting.agura,          // あぐら
+            Utility.GuidList.animations.sitting.tatehiza_boy    // 立膝（男）
         };
 
-
-    /// <summary>
-    /// Constructor
-    /// </summary>
-    /// <param name="avatar">アバターのGameObject</param>
-    public SupineCombiner(GameObject avatar)
-    {
-        _avatar = avatar;
-        _avatar_name = avatar.name;
-        _avatarDescriptor = avatar.GetComponent<VRCAvatarDescriptor>();
-
-        if (_avatarDescriptor == null)
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="avatar">GameObject アバター</param>
+        /// <param name="exMode">bool EXモード</param>
+        public SupineCombiner(GameObject avatar, bool exMode = false)
         {
-            // avatar descriptorがなければエラー
-            Debug.LogError("[VRCSupine] Could not find VRCAvatarDescriptor.");
-            canCombine = false;
-        }
-        else if (HasGeneratedFiles())
-        {
-            //  すでに組込済みの場合、(アバター名)_(数字)で作れるようになるまでループ回す
-            alreadyCombined = true;
-            Debug.Log("[VRCSupine] Directory already exists. Try to create new directory.");
-            int suffix;
-            for (suffix=1; HasGeneratedFiles(suffix); suffix++);
-            _avatar_name = _avatar_name + "_" + suffix.ToString();
-        }
-
-        if (FindOtherSupinePrefab())
-        {
-            otherSupinePrefabPlaced = true;
-            Debug.Log("[VRCSupine] Detect other supine prefab. Will replace by new prefab.");
-        }
-    }
-
-    /// <summary>
-    /// Modular Avatar Prefabを組み立ててavatar直下に設置
-    /// </summary>
-    public void CreateMAPrefab(
-        bool shouldInheritOriginalAnimation = true,
-        bool disableJumpMotion = true,
-        bool enableJumpAtDesktop = true,
-        int sittingPoseOrder1 = 0,
-        int sittingPoseOrder2 = 1,
-        bool shouldCleanCombinedSupine = false
-    )
-    {
-        if (canCombine)
-        {
-            // Locomotionを組む
-            var supineLocomotion = GetTemplateController();
-
-            if (shouldInheritOriginalAnimation)
-            {
-                var originalLocomotion = _avatarDescriptor.baseAnimationLayers[0].animatorController as AnimatorController;
-                supineLocomotion = InheritOriginalAnimation(supineLocomotion, originalLocomotion) as AnimatorController;
-            }
+            _avatar = avatar;
+            _avatar_name_with_suffix = avatar.name;
+            _avatarDescriptor = avatar.GetComponent<VRCAvatarDescriptor>();
+            _exMode = exMode;
             
-            supineLocomotion = ToggleJumpMotion(supineLocomotion, !disableJumpMotion, enableJumpAtDesktop) as AnimatorController;
+            if(_exMode) SwitchToExMode();
+            else SwitchToNormalMode();
 
-            SetSittingAnimations(supineLocomotion, sittingPoseOrder1, sittingPoseOrder2);
-
-            Debug.Log("[VRCSupine] Created the directory '" + MakeGeneratedDirPath() + "'.");
-
-            var maPrefab = GetMAPrefab();
-            var createdPrefab = GameObject.Find(maPrefab.name);
-            var maGameObj = PrefabUtility.InstantiatePrefab(maPrefab, _avatar.transform) as GameObject;
-            var component = maGameObj.GetComponents<ModularAvatarMergeAnimator>()[0];
-            component.animator = supineLocomotion;
-
-            EditorUtility.SetDirty(component);
-
-            // 設置済みのMAPrefabを整理
-            SortAndCleanMAPrefab(maGameObj, createdPrefab);
-
-            // 結合済みのごろ寝システムを削除
-            if (shouldCleanCombinedSupine) {
-                CleanCombinedSupine();
-            }
-
-            Debug.Log("[VRCSupine] MA Prefab creation is done.");
-        } else {
-            Debug.LogError("[VRCSupine] Could not create MA Prefab.");
-        }
-    }
-
-    protected virtual AnimatorController GetTemplateController()
-    {
-        return CopyAssetFromGuid<AnimatorController>(_animatorGuid);
-    }
-
-    protected virtual GameObject GetMAPrefab()
-    {
-        string maPrefabPath = AssetDatabase.GUIDToAssetPath(_maPrefabGuid);
-        return AssetDatabase.LoadAssetAtPath<GameObject>(maPrefabPath);
-    }
-
-    private void SortAndCleanMAPrefab(GameObject newPrefab, GameObject oldPrefab)
-    {
-        bool indexReplaced = false;
-        if (oldPrefab != null)
-        {
-            int createdPrefabIndex = oldPrefab.transform.GetSiblingIndex();
-            newPrefab.transform.SetSiblingIndex(createdPrefabIndex);
-            GameObject.DestroyImmediate(oldPrefab);
-            indexReplaced = true;
-        }
-
-        GameObject otherSupinePrefab = FindOtherSupinePrefab();
-        if (otherSupinePrefab)
-        {
-            if (!indexReplaced)
+            if (_avatarDescriptor == null)
             {
-                int otherSupinePrefabIndex = otherSupinePrefab.transform.GetSiblingIndex();
-                newPrefab.transform.SetSiblingIndex(otherSupinePrefabIndex);
+                // avatar descriptorがなければエラー
+                Debug.LogError("[VRCSupine] Could not find VRCAvatarDescriptor.");
+                canCombine = false;
             }
-
-            GameObject.DestroyImmediate(otherSupinePrefab);
-        }
-    }
-
-    protected virtual GameObject FindOtherSupinePrefab()
-    {
-        return GameObject.Find("SupineMA_EX");
-    }
-
-    private AnimatorController InheritOriginalAnimation(AnimatorController supineLocomotion, AnimatorController originalLocomotion)
-    {
-        // statesを取り出し
-        var supineLocomotionStates = supineLocomotion.layers[0].stateMachine.states;
-
-        // 元のLocomotionがあればアニメーションを取り出す
-        if (originalLocomotion != null)
-        {
-            var originalLocomotionStates = originalLocomotion.layers[0].stateMachine.states;
-            var standingState = FindStateByName(originalLocomotionStates, "Standing");
-            var crouchingState = FindStateByName(originalLocomotionStates, "Crouching");
-            var proneState = FindStateByName(originalLocomotionStates, "Prone");
-
-            // モーション上書き
-            var standing = FindStateByName(supineLocomotionStates, "Standing");
-            var crouching = FindStateByName(supineLocomotionStates, "Crouching");
-            var prone = FindStateByName(supineLocomotionStates, "Prone");
-            if (standingState != null)
-                standing.motion = standingState.motion;
-            if (crouchingState != null)
-                crouching.motion = crouchingState.motion;
-            if (proneState != null)
-                prone.motion = proneState.motion;
-        }
-
-        return supineLocomotion;
-    }
-
-    private AnimatorController ToggleJumpMotion(AnimatorController supineLocomotion, bool enableJump, bool enableJumpAtDesktop)
-    {
-        AnimatorControllerParameter[] parameters = supineLocomotion.parameters;
-        foreach (AnimatorControllerParameter parameter in parameters)
-        {
-            if (parameter.name == "EnableJumpMotion")
+            else if (HasGeneratedFiles())
             {
-                parameter.defaultBool = enableJump;
+                //  すでに組込済みの場合、(アバター名)_(数字)で作れるようになるまでループ回す
+                int suffix;
+                for (suffix=1; HasGeneratedFiles(suffix); suffix++);
+                _avatar_name_with_suffix += "_" + suffix.ToString();
             }
-            else if (parameter.name == "EnableJumpAtDesktop")
+        }
+
+        private void SwitchToExMode()
+        {
+            _maPrefabGuid   = Utility.GuidList.prefabs.ex;
+            _controllerGuid = Utility.GuidList.controllers.ex;
+            _appVersion     = Utility.GetAppVersionEX();
+        }
+
+        private void SwitchToNormalMode()
+        {
+            _maPrefabGuid   = Utility.GuidList.prefabs.normal;
+            _controllerGuid = Utility.GuidList.controllers.normal;
+            _appVersion     = Utility.GetAppVersion();
+        }
+
+        /// <summary>
+        /// コントローラを編集してMA Prefabに差し込みavatar直下に設置
+        /// </summary>
+        /// <param name="shouldInheritOriginalAnimation">bool 歩行アニメーションの継承</param>
+        /// <param name="disableJumpMotion">bool ジャンプモーションの無効</param>
+        /// <param name="enableJumpAtDesktop">bool デスクトップでジャンプモーションを有効化</param>
+        /// <param name="sittingPoseOrder1">int 座りポーズ1</param>
+        /// <param name="sittingPoseOrder2">int 座りポーズ2</param>
+        /// <param name="shouldCleanCombinedSupine">bool 古いごろ寝システムを削除する</param>
+        public void CreateMAPrefab(
+            bool shouldInheritOriginalAnimation = true,
+            bool disableJumpMotion = true,
+            bool enableJumpAtDesktop = true,
+            int sittingPoseOrder1 = 0,
+            int sittingPoseOrder2 = 1,
+            bool shouldCleanCombinedSupine = false
+        )
+        {
+            if (canCombine)
             {
-                parameter.defaultBool = enableJumpAtDesktop;
+                // オプションに従ってLocomotionを編集
+                AnimatorController supineLocomotion = CopyAssetFromGuid<AnimatorController>(_controllerGuid);
+
+                if (shouldInheritOriginalAnimation)
+                {
+                    AnimatorController originalLocomotion = _avatarDescriptor.baseAnimationLayers[0].animatorController as AnimatorController;
+                    supineLocomotion = InheritOriginalAnimation(supineLocomotion, originalLocomotion);
+                }
+                supineLocomotion = ToggleJumpMotion(supineLocomotion, !disableJumpMotion, enableJumpAtDesktop);
+                supineLocomotion = SetSittingAnimations(supineLocomotion, sittingPoseOrder1, sittingPoseOrder2);
+
+                // MA Prefabを設置＆編集したLocomotionを差す
+                string maPrefabPath = AssetDatabase.GUIDToAssetPath(_maPrefabGuid);
+                GameObject maPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(maPrefabPath);
+                GameObject alreadyPlacedPrefab = GameObject.Find(maPrefab.name);
+                GameObject maPrefabInstance = PrefabUtility.InstantiatePrefab(maPrefab, _avatar.transform) as GameObject;
+
+                ModularAvatarMergeAnimator component = maPrefabInstance.GetComponents<ModularAvatarMergeAnimator>()[0];
+                component.animator = supineLocomotion;
+                EditorUtility.SetDirty(component);
+
+                // 設置済みのMAPrefabを整理
+                SortAndCleanMAPrefab(maPrefabInstance, alreadyPlacedPrefab);
+
+                // 結合済みの古いごろ寝システムを削除
+                if (shouldCleanCombinedSupine) {
+                    OldSupineCleaner.CleanCombinedSupine(_avatarDescriptor);
+                }
+
+                Debug.Log("[VRCSupine] MA Prefab creation is done.");
+            } else {
+                Debug.LogError("[VRCSupine] Could not create MA Prefab.");
             }
         }
 
-        supineLocomotion.parameters = parameters;
-
-        return supineLocomotion;
-    }
-
-    private AnimatorController SetSittingAnimations(AnimatorController supineLocomotion, int sittingPoseOrder1, int sittingPoseOrder2)
-    {
-        // statesを取り出し
-        var supineLocomotionStates = supineLocomotion.layers[0].stateMachine.states;
-
-        // 座りアニメーションを変更
-        var sittingPose1Path = AssetDatabase.GUIDToAssetPath(_sittingAnimationGuids[sittingPoseOrder1]);
-        var sittingPose2Path = AssetDatabase.GUIDToAssetPath(_sittingAnimationGuids[sittingPoseOrder2]);
-        var sittingPose1 = AssetDatabase.LoadAssetAtPath<AnimationClip>(sittingPose1Path);
-        var sittingPose2 = AssetDatabase.LoadAssetAtPath<AnimationClip>(sittingPose2Path);
-        var sittingPose1State = FindStateByName(supineLocomotionStates, "Sit 1");
-        var sittingPose2State = FindStateByName(supineLocomotionStates, "Sit 2");
-        sittingPose1State.motion = sittingPose1 as AnimationClip;
-        sittingPose2State.motion = sittingPose2 as AnimationClip;
-
-        return supineLocomotion;
-    }
-
-    protected T CopyAssetFromGuid<T>(string guid) where T : Object
-    {
-        string templatePath = AssetDatabase.GUIDToAssetPath(guid);
-        string templateName = Path.GetFileName(templatePath);
-        string generatedPath = MakeGeneratedDirPath() + "/" + _avatar_name + "_" + templateName;
-
-        if (!Directory.Exists(MakeGeneratedDirPath()))
+        /// <summary>
+        /// 歩行モーションを継承する
+        /// </summary>
+        /// <param name="originalLocomotion">オリジナルのBaseコントローラ</param>
+        /// <param name="supineLocomotion">ごろ寝システムのBaseコントローラ</param>
+        private AnimatorController InheritOriginalAnimation(AnimatorController supineLocomotion, AnimatorController originalLocomotion)
         {
-            CreateFolderRecursively(MakeGeneratedDirPath());
-        }
+            // statesを取り出し
+            ChildAnimatorState[] supineLocomotionStates = supineLocomotion.layers[0].stateMachine.states;
 
-        if (!AssetDatabase.CopyAsset(templatePath, generatedPath))
-        {
-            Debug.LogError("[VRCSupine] Could not create asset: (" + generatedPath + ") from: (" + templatePath + ")");
-            throw new IOException();
-        }
-
-        return AssetDatabase.LoadAssetAtPath<T>(generatedPath);
-    }
-
-    private void CreateFolderRecursively(string path)
-    {
-        if (!path.StartsWith("Assets/"))
-        {
-            Debug.LogError("[VRCSupine] Could not create directory: (" + path + ") this is not in Assets");
-            throw new IOException();
-        }
-
-        var dirs = path.Split('/');
-        var combinePath = dirs[0];
-        foreach (var dir in dirs.Skip(1))
-        {
-            if (!AssetDatabase.IsValidFolder(combinePath + '/' + dir))
+            // 元のLocomotionがあればアニメーションを取り出す
+            if (originalLocomotion != null)
             {
-                AssetDatabase.CreateFolder(combinePath, dir);
+                ChildAnimatorState[] originalLocomotionStates = originalLocomotion.layers[0].stateMachine.states;
+                AnimatorState originalStanding  = Utility.FindAnimatorStateByName(originalLocomotionStates, "Standing");
+                AnimatorState originalCrouching = Utility.FindAnimatorStateByName(originalLocomotionStates, "Crouching");
+                AnimatorState originalProne     = Utility.FindAnimatorStateByName(originalLocomotionStates, "Prone");
+
+                // モーション上書き
+                AnimatorState standing  = Utility.FindAnimatorStateByName(supineLocomotionStates, "Standing");
+                AnimatorState crouching = Utility.FindAnimatorStateByName(supineLocomotionStates, "Crouching");
+                AnimatorState prone     = Utility.FindAnimatorStateByName(supineLocomotionStates, "Prone");
+                if (originalStanding != null)
+                    standing.motion = originalStanding.motion;
+                if (originalCrouching != null)
+                    crouching.motion = originalCrouching.motion;
+                if (originalProne != null)
+                    prone.motion = originalProne.motion;
             }
-            combinePath += '/' + dir;
-        }
-    }
 
-    private string MakeGeneratedDirPath(int suffix = 0)
-    {
-        string generatedDirPath = _mmmAssetsPath + '/' + GetAppVersion() + "/Generated";
-        if (suffix > 0) {
-            return generatedDirPath + "/" + _avatar_name + "_" + suffix.ToString();
+            return supineLocomotion;
         }
-        else
+
+        /// <summary>
+        /// ジャンプモーションの有効・無効を切り替える
+        /// </summary>
+        /// <param name="supineLocomotion">ごろ寝システムのBaseコントローラ</param>
+        /// <param name="enableJump">bool ジャンプを有効にするか</param>
+        /// <param name="enableJumpAtDesktop">bool デスクトップでジャンプを有効にするか</param>
+        private AnimatorController ToggleJumpMotion(AnimatorController supineLocomotion, bool enableJump, bool enableJumpAtDesktop)
         {
-            return generatedDirPath + "/" + _avatar_name;
-        }
-    }
-
-    private bool HasGeneratedFiles(int suffix = 0)
-    {
-        return AssetDatabase.IsValidFolder(MakeGeneratedDirPath(suffix));
-    }
-
-    protected virtual string GetAppVersion()
-    {
-        return File.ReadAllText(AssetDatabase.GUIDToAssetPath(_appVersionTextGuid));
-    }
-
-    private void CleanCombinedSupine()
-    {
-        // SerializedObjectで操作する
-        var descriptorObj = new SerializedObject(_avatarDescriptor);
-        descriptorObj.FindProperty("customizeAnimationLayers").boolValue = true;
-        descriptorObj.FindProperty("customExpressions").boolValue = true;
-
-        // ExMenuを組む
-        var descriptorMenuProp = descriptorObj.FindProperty("expressionsMenu");
-
-        ExpressionsMenu descriptorMenu = _avatarDescriptor.expressionsMenu;
-        if (descriptorMenu == null) descriptorMenu = new ExpressionsMenu();
-        var descriptorControls = descriptorMenu.controls;
-        if (descriptorControls == null) descriptorControls = new List<ExpressionsMenuControl>();
-        
-        EditorUtility.SetDirty(descriptorMenu);
-        descriptorMenu.controls = RemoveCombinedExMenuControls(descriptorControls);
-
-        descriptorMenuProp.objectReferenceValue = descriptorMenu;
-
-        // ExParametersを組む
-        var descriptorParamsProp = descriptorObj.FindProperty("expressionParameters");
-
-        var descriptorParams = _avatarDescriptor.expressionParameters;
-        if (descriptorParams == null) descriptorParams = new ExpressionParameters();
-        var descriptorParamsArray = descriptorParams.parameters;
-        if (descriptorParamsArray == null) descriptorParamsArray = new ExpressionParameter[0];
-
-        EditorUtility.SetDirty(descriptorParams);
-        descriptorParams.parameters = RemoveCombinedExParameters(descriptorParamsArray);
-
-        descriptorParamsProp.objectReferenceValue = descriptorParams;
-
-        // 変更を適用
-        descriptorObj.ApplyModifiedProperties();
-    }
-
-    private List<ExpressionsMenuControl> RemoveCombinedExMenuControls(List<ExpressionsMenuControl> exMenuControls)
-    {
-        // ごろ寝メニューがあれば削除
-        exMenuControls.RemoveAll(IsCombinedSupineMenu);
-        return exMenuControls;
-    }
-
-    private ExpressionParameter[] RemoveCombinedExParameters(ExpressionParameter[] exParams)
-    {
-        // ごろ寝パラメータがあれば削除
-        var exParamsList = new List<ExpressionParameter>(exParams);
-        exParamsList.RemoveAll(IsSupineParameter);
-        return exParamsList.ToArray<ExpressionParameter>();
-    }
-
-    private bool IsCombinedSupineMenu(ExpressionsMenuControl control)
-    {
-        // ごろ寝サブメニューか
-        bool isSupineMenu = (control.name == "Suimin"   && control.type == ExpressionsMenuControl.ControlType.SubMenu) ||
-                            (control.name == "SuiminEx" && control.type == ExpressionsMenuControl.ControlType.SubMenu);
-        return isSupineMenu;
-    }
-
-    private bool IsSupineParameter(ExpressionParameter parameter)
-    {
-        // ごろ寝パラメータと一致するか
-        return _oldSupineParameters.Contains(parameter, new ExParameterComparer());
-    }
-
-    private AnimatorState FindStateByName(ChildAnimatorState[] states, string name)
-    {
-        // 名前でステートを探索
-        foreach (var childState in states)
-        {
-            if (childState.state.name == name)
+            AnimatorControllerParameter[] parameters = supineLocomotion.parameters;
+            foreach (AnimatorControllerParameter parameter in parameters)
             {
-                return childState.state;
+                if (parameter.name == "EnableJumpMotion")
+                {
+                    parameter.defaultBool = enableJump;
+                }
+                else if (parameter.name == "EnableJumpAtDesktop")
+                {
+                    parameter.defaultBool = enableJumpAtDesktop;
+                }
+            }
+
+            supineLocomotion.parameters = parameters;
+
+            return supineLocomotion;
+        }
+
+        /// <summary>
+        /// 座りモーションの設定
+        /// </summary>
+        /// <param name="supineLocomotion">ごろ寝システムのBaseコントローラ</param>
+        /// <param name="sittingPoseOrder1">int 座りポーズ1</param>
+        /// <param name="sittingPoseOrder2">int 座りポーズ2</param>
+        private AnimatorController SetSittingAnimations(AnimatorController supineLocomotion, int sittingPoseOrder1, int sittingPoseOrder2)
+        {
+            // statesを取り出し
+            ChildAnimatorState[] supineLocomotionStates = supineLocomotion.layers[0].stateMachine.states;
+
+            // 座りアニメーションを変更
+            string sittingPose1Path = AssetDatabase.GUIDToAssetPath(SittingAnimationGuids[sittingPoseOrder1]);
+            string sittingPose2Path = AssetDatabase.GUIDToAssetPath(SittingAnimationGuids[sittingPoseOrder2]);
+            AnimationClip sittingPose1 = AssetDatabase.LoadAssetAtPath<AnimationClip>(sittingPose1Path);
+            AnimationClip sittingPose2 = AssetDatabase.LoadAssetAtPath<AnimationClip>(sittingPose2Path);
+            AnimatorState sittingPose1State = Utility.FindAnimatorStateByName(supineLocomotionStates, "Sit 1");
+            AnimatorState sittingPose2State = Utility.FindAnimatorStateByName(supineLocomotionStates, "Sit 2");
+            sittingPose1State.motion = sittingPose1;
+            sittingPose2State.motion = sittingPose2;
+
+            return supineLocomotion;
+        }
+
+        /// <summary>
+        /// 新しいMA Prefabと古いMA Prefabの位置を整理する
+        /// EX⇔通常版の入れ替えも行う
+        /// </summary>
+        /// <param name="newPrefab">新しいMA Prefab</param>
+        /// <param name="oldPrefab">古いMA Prefab</param>
+        private void SortAndCleanMAPrefab(GameObject newPrefab, GameObject oldPrefab)
+        {
+            bool indexReplaced = false;
+            if (oldPrefab != null)
+            {
+                int createdPrefabIndex = oldPrefab.transform.GetSiblingIndex();
+                newPrefab.transform.SetSiblingIndex(createdPrefabIndex);
+                GameObject.DestroyImmediate(oldPrefab);
+                indexReplaced = true;
+            }
+
+            GameObject otherSupinePrefab = _exMode ? GameObject.Find(SupineNormalPrefabName) : GameObject.Find(SupineExPrefabName);
+            if (otherSupinePrefab)
+            {
+                if (!indexReplaced)
+                {
+                    int otherSupinePrefabIndex = otherSupinePrefab.transform.GetSiblingIndex();
+                    newPrefab.transform.SetSiblingIndex(otherSupinePrefabIndex);
+                }
+
+                GameObject.DestroyImmediate(otherSupinePrefab);
             }
         }
-        return null;
-    }
 
+        /// <summary>
+        /// GUIDを指定してアセットをコピーする
+        /// </summary>
+        /// <param name="guid">GUID</param>
+        private T CopyAssetFromGuid<T>(string guid) where T : Object
+        {
+            string templatePath = AssetDatabase.GUIDToAssetPath(guid);
+            string templateName = Path.GetFileName(templatePath);
+            string destinationPath = MakeGeneratedDirPath() + "/" + _avatar_name_with_suffix + "_" + templateName;
+
+            return Utility.CopyAssetFromPath<T>(templatePath, destinationPath);
+        }
+
+        /// <summary>
+        /// 生成したごろ寝システムコントローラを置くディレクトリパスを作成
+        /// </summary>
+        /// <param name="suffix">int 後ろにつける数字</param>
+        private string MakeGeneratedDirPath(int suffix = 0)
+        {
+            string generatedDirPath = MmmAssetPath + '/' + _appVersion + "/Generated";
+            if (suffix > 0) {
+                return generatedDirPath + "/" + _avatar_name_with_suffix + "_" + suffix.ToString();
+            }
+            else
+            {
+                return generatedDirPath + "/" + _avatar_name_with_suffix;
+            }
+        }
+
+        /// <summary>
+        /// すでに作成されたファイルがあるか判定
+        /// </summary>
+        /// <param name="suffix">int 後ろにつける数字</param>
+        /// <returns>bool</returns>
+        private bool HasGeneratedFiles(int suffix = 0)
+        {
+            return AssetDatabase.IsValidFolder(MakeGeneratedDirPath(suffix));
+        }
+    }
 }
