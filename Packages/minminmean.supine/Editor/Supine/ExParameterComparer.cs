@@ -1,15 +1,18 @@
 using System.Collections.Generic;
 using ExpressionParameter = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionParameters.Parameter;
 
-class ExParameterComparer : IEqualityComparer<ExpressionParameter>
+namespace Supine
 {
-    public bool Equals(ExpressionParameter x, ExpressionParameter y)
+    class ExParameterComparer : IEqualityComparer<ExpressionParameter>
     {
-        return x.name == y.name && x.valueType == y.valueType;
-    }
+        public bool Equals(ExpressionParameter x, ExpressionParameter y)
+        {
+            return x.name == y.name && x.valueType == y.valueType;
+        }
 
-    public int GetHashCode(ExpressionParameter parameter)
-    {
-        return ( parameter.name + parameter.valueType.ToString()).GetHashCode();
+        public int GetHashCode(ExpressionParameter parameter)
+        {
+            return ( parameter.name + parameter.valueType.ToString()).GetHashCode();
+        }
     }
 }

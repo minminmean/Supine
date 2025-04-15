@@ -1,0 +1,48 @@
+{
+    "animations":
+    {
+        "sitting":
+        {
+            "petan":            "4de1b4829899b754db2ec3e28014a61e",
+            "tatehiza_girl":    "8d965ea5d99a8cf40bd517890509b5b2",
+            "agura":            "7763fb4ad4e8be942861867e99e04deb",
+            "tatehiza_boy":     "1e0291513c4de5e4c8c210f788354cba"
+        },
+        "sleeping":
+        {
+            "supine":           "adbf135c4c39838468dd57f40ab87d50",
+            "side_sleep":       "dbdf598328dd2ef4daa7d95353346932",
+            "supine_r":         "f851f3dbd5be7e14096a2e2c04fd0eaa",
+            "supine_l":         "e8c4841f6ff381d4db805e86dd4a35ff",
+            "side_sleep_c":     "3fae5894e0019814c993a329e94ba15e",
+            "side_sleep_rev":   "2f2f7310d8608fe4fa6ea4bda4561429"
+        },
+        "ex":
+        {
+            "mji":      "0e46895cbc3eebd43a2ba9a1b74ac856",
+            "disk":     "b623437f54ad5b84db81ff8f17f8c984",
+            "kji":      "f0e5d6eac8d64fb47b45de50dde2c9e7",
+            "kji_znk":  "b83d4cf456db8ba4db2c7aef7ca658f3",
+            "snk":      "6367f8b3ecee27546bac9730da9e2374",
+            "srag":     "f3d58521531b8234887555ddebf8ef6c"
+        }
+    },
+
+    "controllers":
+    {
+        "normal":   "54574f02780fe18449d0bdf9e17bee7d",
+        "ex":       "c22e5b6c49df9ff4f9a7c6e1c3442cea"
+    },
+
+    "prefabs":
+    {
+        "normal":   "f0776ab98fcb1bd4fbb991a3fb0f3d54",
+        "ex":       "53c2fb51ef8e9804aa712d877203b4cf"
+    },
+
+    "app_versions":
+    {
+        "normal":   "71c4325af3f46224cafbab56dd5824b1",
+        "ex":       "0e3ca72d31adafa45ab752ce60b7c255"
+    }
+}
