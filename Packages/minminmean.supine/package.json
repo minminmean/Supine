@@ -1,11 +1,11 @@
 {
   "name": "minminmean.supine",
   "displayName": "Gorone System (Supine)",
-  "version": "4.2.3",
+  "version": "4.2.4",
   "description": "Have a good sleep",
   "gitDependencies": {},
   "vpmDependencies": {
-    "com.vrchat.avatars": ">=3.8.0",
+    "com.vrchat.avatars": ">=3.7.0",
     "nadena.dev.modular-avatar": ">=1.12.3"
   },
   "author": {
@@ -14,7 +14,8 @@
     "url": "https://github.com/minminmean"
   },
   "legacyFolders": {
-    "Assets\\MinMinMart": "76952c3cbc2ccee41a286a59af040b88"
+    "Assets\\MinMinMart\\Supine": "2d76018424e030f4597625fa4cdb0d28",
+    "Assets\\Supine": "2d76018424e030f4597625fa4cdb0d28"
   },
   "unity": "2022.3"
 }
