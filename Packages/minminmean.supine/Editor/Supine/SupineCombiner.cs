@@ -53,6 +53,9 @@ namespace Supine
             _avatar_name_with_suffix = avatar.name;
             _avatarDescriptor = avatar.GetComponent<VRCAvatarDescriptor>();
             _exMode = exMode;
+            
+            if(_exMode) SwitchToExMode();
+            else SwitchToNormalMode();
 
             if (_avatarDescriptor == null)
             {
@@ -66,15 +69,6 @@ namespace Supine
                 int suffix;
                 for (suffix=1; HasGeneratedFiles(suffix); suffix++);
                 _avatar_name_with_suffix += "_" + suffix.ToString();
-            }
-
-            if (_exMode)
-            {
-                SwitchToExMode();
-            }
-            else
-            {
-                SwitchToNormalMode();
             }
         }
 
