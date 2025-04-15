@@ -26,13 +26,15 @@ namespace Supine
         private GameObject _avatar;
         private string _avatar_name_with_suffix;
         private VRCAvatarDescriptor _avatarDescriptor;
+        private bool _exMode = false;
         public bool canCombine = true;
 
-        private string MmmAssetPath = "Assets/MinMinMart";
-        private string MaPrefabGuid = Utility.GuidList.prefabs.normal;
-        private string ControllerGuid = Utility.GuidList.controllers.normal;
-        private string OtherSupinePrefabName = "SupineMA_EX";
-        private string AppVersion = Utility.GetAppVersion();
+        private string MmmAssetPath           = "Assets/MinMinMart";
+        private string SupineNormalPrefabName = "SupineMA";
+        private string SupineExPrefabName     = "SupineMA_EX";
+        private string _maPrefabGuid    = Utility.GuidList.prefabs.normal;
+        private string _controllerGuid  = Utility.GuidList.controllers.normal;
+        private string _appVersion      = Utility.GetAppVersion();
         private string[] SittingAnimationGuids =
         {
             Utility.GuidList.animations.sitting.petan,          // ぺたん
@@ -45,11 +47,12 @@ namespace Supine
         /// Constructor
         /// </summary>
         /// <param name="avatar">アバターのGameObject</param>
-        public SupineCombiner(GameObject avatar)
+        public SupineCombiner(GameObject avatar, bool exMode = false)
         {
             _avatar = avatar;
             _avatar_name_with_suffix = avatar.name;
             _avatarDescriptor = avatar.GetComponent<VRCAvatarDescriptor>();
+            _exMode = exMode;
 
             if (_avatarDescriptor == null)
             {
@@ -64,6 +67,29 @@ namespace Supine
                 for (suffix=1; HasGeneratedFiles(suffix); suffix++);
                 _avatar_name_with_suffix += "_" + suffix.ToString();
             }
+
+            if (_exMode)
+            {
+                SwitchToExMode();
+            }
+            else
+            {
+                SwitchToNormalMode();
+            }
+        }
+
+        private void SwitchToExMode()
+        {
+            _maPrefabGuid   = Utility.GuidList.prefabs.ex;
+            _controllerGuid = Utility.GuidList.controllers.ex;
+            _appVersion     = Utility.GetAppVersionEX();
+        }
+
+        private void SwitchToNormalMode()
+        {
+            _maPrefabGuid   = Utility.GuidList.prefabs.normal;
+            _controllerGuid = Utility.GuidList.controllers.normal;
+            _appVersion     = Utility.GetAppVersion();
         }
 
         /// <summary>
@@ -81,7 +107,7 @@ namespace Supine
             if (canCombine)
             {
                 // オプションに従ってLocomotionを編集
-                AnimatorController supineLocomotion = CopyAssetFromGuid<AnimatorController>(ControllerGuid);
+                AnimatorController supineLocomotion = CopyAssetFromGuid<AnimatorController>(_controllerGuid);
 
                 if (shouldInheritOriginalAnimation)
                 {
@@ -92,7 +118,7 @@ namespace Supine
                 supineLocomotion = SetSittingAnimations(supineLocomotion, sittingPoseOrder1, sittingPoseOrder2);
 
                 // MA Prefabを設置＆編集したLocomotionを差す
-                string maPrefabPath = AssetDatabase.GUIDToAssetPath(MaPrefabGuid);
+                string maPrefabPath = AssetDatabase.GUIDToAssetPath(_maPrefabGuid);
                 GameObject maPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(maPrefabPath);
                 GameObject alreadyPlacedPrefab = GameObject.Find(maPrefab.name);
                 GameObject maPrefabInstance = PrefabUtility.InstantiatePrefab(maPrefab, _avatar.transform) as GameObject;
@@ -193,7 +219,7 @@ namespace Supine
                 indexReplaced = true;
             }
 
-            GameObject otherSupinePrefab = GameObject.Find(OtherSupinePrefabName);
+            GameObject otherSupinePrefab = _exMode ? GameObject.Find(SupineNormalPrefabName) : GameObject.Find(SupineExPrefabName);
             if (otherSupinePrefab)
             {
                 if (!indexReplaced)
@@ -217,7 +243,7 @@ namespace Supine
 
         private string MakeGeneratedDirPath(int suffix = 0)
         {
-            string generatedDirPath = MmmAssetPath + '/' + AppVersion + "/Generated";
+            string generatedDirPath = MmmAssetPath + '/' + _appVersion + "/Generated";
             if (suffix > 0) {
                 return generatedDirPath + "/" + _avatar_name_with_suffix + "_" + suffix.ToString();
             }
