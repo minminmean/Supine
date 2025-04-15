@@ -1,15 +1,8 @@
 using System.IO;
-using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.Animations;
 using VRC.SDK3.Avatars.Components;
-
-using ExpressionsMenu = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionsMenu;
-using ExpressionsMenuControl = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionsMenu.Control;
-using ExpressionParameters = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionParameters;
-using ExpressionParameter = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionParameters.Parameter;
 
 using ModularAvatarMergeAnimator = nadena.dev.modular_avatar.core.ModularAvatarMergeAnimator;
 using Supine.Utilities;
@@ -18,7 +11,7 @@ namespace Supine
 {
 
     /// <summary>
-    /// avatarにLocomotion, Menu, Parametersを組み込むクラス
+    /// avatarにごろ寝システムPrefabを設置するためのクラス
     /// </summary>
 
     public class SupineCombiner
@@ -46,7 +39,8 @@ namespace Supine
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="avatar">アバターのGameObject</param>
+        /// <param name="avatar">GameObject アバター</param>
+        /// <param name="exMode">bool EXモード</param>
         public SupineCombiner(GameObject avatar, bool exMode = false)
         {
             _avatar = avatar;
@@ -87,8 +81,14 @@ namespace Supine
         }
 
         /// <summary>
-        /// Modular Avatar Prefabを組み立ててavatar直下に設置
+        /// コントローラを編集してMA Prefabに差し込みavatar直下に設置
         /// </summary>
+        /// <param name="shouldInheritOriginalAnimation">bool 歩行アニメーションの継承</param>
+        /// <param name="disableJumpMotion">bool ジャンプモーションの無効</param>
+        /// <param name="enableJumpAtDesktop">bool デスクトップでジャンプモーションを有効化</param>
+        /// <param name="sittingPoseOrder1">int 座りポーズ1</param>
+        /// <param name="sittingPoseOrder2">int 座りポーズ2</param>
+        /// <param name="shouldCleanCombinedSupine">bool 古いごろ寝システムを削除する</param>
         public void CreateMAPrefab(
             bool shouldInheritOriginalAnimation = true,
             bool disableJumpMotion = true,
@@ -135,7 +135,11 @@ namespace Supine
             }
         }
 
-
+        /// <summary>
+        /// 歩行モーションを継承する
+        /// </summary>
+        /// <param name="originalLocomotion">オリジナルのBaseコントローラ</param>
+        /// <param name="supineLocomotion">ごろ寝システムのBaseコントローラ</param>
         private AnimatorController InheritOriginalAnimation(AnimatorController supineLocomotion, AnimatorController originalLocomotion)
         {
             // statesを取り出し
@@ -164,6 +168,12 @@ namespace Supine
             return supineLocomotion;
         }
 
+        /// <summary>
+        /// ジャンプモーションの有効・無効を切り替える
+        /// </summary>
+        /// <param name="supineLocomotion">ごろ寝システムのBaseコントローラ</param>
+        /// <param name="enableJump">bool ジャンプを有効にするか</param>
+        /// <param name="enableJumpAtDesktop">bool デスクトップでジャンプを有効にするか</param>
         private AnimatorController ToggleJumpMotion(AnimatorController supineLocomotion, bool enableJump, bool enableJumpAtDesktop)
         {
             AnimatorControllerParameter[] parameters = supineLocomotion.parameters;
@@ -184,6 +194,12 @@ namespace Supine
             return supineLocomotion;
         }
 
+        /// <summary>
+        /// 座りモーションの設定
+        /// </summary>
+        /// <param name="supineLocomotion">ごろ寝システムのBaseコントローラ</param>
+        /// <param name="sittingPoseOrder1">int 座りポーズ1</param>
+        /// <param name="sittingPoseOrder2">int 座りポーズ2</param>
         private AnimatorController SetSittingAnimations(AnimatorController supineLocomotion, int sittingPoseOrder1, int sittingPoseOrder2)
         {
             // statesを取り出し
@@ -202,6 +218,12 @@ namespace Supine
             return supineLocomotion;
         }
 
+        /// <summary>
+        /// 新しいMA Prefabと古いMA Prefabの位置を整理する
+        /// EX⇔通常版の入れ替えも行う
+        /// </summary>
+        /// <param name="newPrefab">新しいMA Prefab</param>
+        /// <param name="oldPrefab">古いMA Prefab</param>
         private void SortAndCleanMAPrefab(GameObject newPrefab, GameObject oldPrefab)
         {
             bool indexReplaced = false;
@@ -226,6 +248,10 @@ namespace Supine
             }
         }
 
+        /// <summary>
+        /// GUIDを指定してアセットをコピーする
+        /// </summary>
+        /// <param name="guid">GUID</param>
         private T CopyAssetFromGuid<T>(string guid) where T : Object
         {
             string templatePath = AssetDatabase.GUIDToAssetPath(guid);
@@ -235,6 +261,10 @@ namespace Supine
             return Utility.CopyAssetFromPath<T>(templatePath, destinationPath);
         }
 
+        /// <summary>
+        /// 生成したごろ寝システムコントローラを置くディレクトリパスを作成
+        /// </summary>
+        /// <param name="suffix">int 後ろにつける数字</param>
         private string MakeGeneratedDirPath(int suffix = 0)
         {
             string generatedDirPath = MmmAssetPath + '/' + _appVersion + "/Generated";
@@ -247,6 +277,11 @@ namespace Supine
             }
         }
 
+        /// <summary>
+        /// すでに作成されたファイルがあるか判定
+        /// </summary>
+        /// <param name="suffix">int 後ろにつける数字</param>
+        /// <returns>bool</returns>
         private bool HasGeneratedFiles(int suffix = 0)
         {
             return AssetDatabase.IsValidFolder(MakeGeneratedDirPath(suffix));

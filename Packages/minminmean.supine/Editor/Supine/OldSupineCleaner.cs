@@ -10,6 +10,10 @@ using ExpressionParameter = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionPara
 
 namespace Supine
 {
+    /// <summary>
+    /// v3.0.2以前のごろ寝を削除するためのユーティリティクラス
+    /// </summary>
+
     class OldSupineCleaner
     {
         private static ExpressionParameter[] _oldSupineParameters = new ExpressionParameter[11]
