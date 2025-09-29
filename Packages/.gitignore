@@ -4,5 +4,9 @@
 !minminmean.supine*
 minminmean.supine/Runtime/Supine/Generated
 minminmean.supine/Runtime/Supine/Generated.meta
+minminmean.supine/Editor/Supine/bin
+minminmean.supine/Editor/Supine/bin.meta
+minminmean.supine/Editor/Supine/obj
+minminmean.supine/Editor/Supine/obj.meta
 packages-lock.json
 vpm-manifest.json
