@@ -23,8 +23,6 @@ namespace Supine
         public bool canCombine = true;
 
         private string MmmAssetPath           = "Assets/MinMinMart";
-        private string SupineNormalPrefabName = "SupineMA";
-        private string SupineExPrefabName     = "SupineMA_EX";
         private string _maPrefabGuid    = Utility.GuidList.prefabs.normal;
         private string _controllerGuid  = Utility.GuidList.controllers.normal;
         private string _appVersion      = Utility.GetAppVersion();
@@ -220,10 +218,10 @@ namespace Supine
 
         /// <summary>
         /// 新しいMA Prefabと古いMA Prefabの位置を整理する
-        /// EX⇔通常版の入れ替えも行う
+        /// 他バリアント（EX⇔通常版など）の入れ替えも行う
         /// </summary>
         /// <param name="newPrefab">新しいMA Prefab</param>
-        /// <param name="oldPrefab">古いMA Prefab</param>
+        /// <param name="oldPrefab">古いMA Prefab（同バリアントの既存設置分）</param>
         private void SortAndCleanMAPrefab(GameObject newPrefab, GameObject oldPrefab)
         {
             bool indexReplaced = false;
@@ -235,8 +233,8 @@ namespace Supine
                 indexReplaced = true;
             }
 
-            GameObject otherSupinePrefab = _exMode ? GameObject.Find(SupineNormalPrefabName) : GameObject.Find(SupineExPrefabName);
-            if (otherSupinePrefab)
+            GameObject otherSupinePrefab = FindOtherSupineSlot(newPrefab);
+            if (otherSupinePrefab != null)
             {
                 if (!indexReplaced)
                 {
@@ -246,6 +244,24 @@ namespace Supine
 
                 GameObject.DestroyImmediate(otherSupinePrefab);
             }
+        }
+
+        /// <summary>
+        /// アバター直下から、自分（newPrefab）以外の設置済みごろ寝システムMA Prefabを探す。
+        /// バリアント名を直接知らなくても、SupineMASlotの有無だけで判定する。
+        /// </summary>
+        /// <param name="newPrefab">今回設置したMA Prefab</param>
+        private GameObject FindOtherSupineSlot(GameObject newPrefab)
+        {
+            foreach (Transform child in _avatar.transform)
+            {
+                if (child.gameObject == newPrefab) continue;
+                if (child.GetComponent<SupineMASlot>() != null)
+                {
+                    return child.gameObject;
+                }
+            }
+            return null;
         }
 
         /// <summary>
