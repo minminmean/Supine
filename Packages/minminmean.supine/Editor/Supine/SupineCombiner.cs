@@ -122,6 +122,9 @@ namespace Supine
                 // 設置済みのMAPrefabを整理
                 SortAndCleanMAPrefab(maPrefabInstance, alreadyPlacedPrefab);
 
+                // SupineMASlot導入以前に設置された、マーカーの無いMA Prefabの残骸を削除（互換対応）
+                OldSupineCleaner.RemoveMarkerlessMAPrefabs(_avatar.transform, maPrefabInstance);
+
                 // 結合済みの古いごろ寝システムを削除
                 if (shouldCleanCombinedSupine) {
                     OldSupineCleaner.CleanCombinedSupine(_avatarDescriptor);
