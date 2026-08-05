@@ -40,39 +40,51 @@ namespace Supine
         
         public static void CleanCombinedSupine(VRCAvatarDescriptor avatarDescriptor)
         {
+            bool hasCombinedMenu = HasCombinedSupineMenu(avatarDescriptor.expressionsMenu);
+            bool hasOldParameters = HasOldSupineParameters(avatarDescriptor.expressionParameters);
+            if (!hasCombinedMenu && !hasOldParameters) return;
+
             // SerializedObjectで操作する
             SerializedObject descriptorObj = new SerializedObject(avatarDescriptor);
             descriptorObj.FindProperty("customizeAnimationLayers").boolValue = true;
             descriptorObj.FindProperty("customExpressions").boolValue = true;
 
-            // ExMenuを組む
-            SerializedProperty descriptorMenuProp = descriptorObj.FindProperty("expressionsMenu");
+            if (hasCombinedMenu)
+            {
+                // ExMenuを組む
+                SerializedProperty descriptorMenuProp = descriptorObj.FindProperty("expressionsMenu");
+                ExpressionsMenu descriptorMenu = avatarDescriptor.expressionsMenu;
 
-            ExpressionsMenu descriptorMenu = avatarDescriptor.expressionsMenu;
-            if (descriptorMenu == null) descriptorMenu = new ExpressionsMenu();
-            List<ExpressionsMenuControl> descriptorControls = descriptorMenu.controls;
-            if (descriptorControls == null) descriptorControls = new List<ExpressionsMenuControl>();
-            
-            EditorUtility.SetDirty(descriptorMenu);
-            descriptorMenu.controls = RemoveCombinedExMenuControls(descriptorControls);
+                EditorUtility.SetDirty(descriptorMenu);
+                descriptorMenu.controls = RemoveCombinedExMenuControls(descriptorMenu.controls);
 
-            descriptorMenuProp.objectReferenceValue = descriptorMenu;
+                descriptorMenuProp.objectReferenceValue = descriptorMenu;
+            }
 
-            // ExParametersを組む
-            SerializedProperty descriptorParamsProp = descriptorObj.FindProperty("expressionParameters");
+            if (hasOldParameters)
+            {
+                // ExParametersを組む
+                SerializedProperty descriptorParamsProp = descriptorObj.FindProperty("expressionParameters");
+                ExpressionParameters descriptorParams = avatarDescriptor.expressionParameters;
 
-            ExpressionParameters descriptorParams = avatarDescriptor.expressionParameters;
-            if (descriptorParams == null) descriptorParams = new ExpressionParameters();
-            ExpressionParameter[] descriptorParamsArray = descriptorParams.parameters;
-            if (descriptorParamsArray == null) descriptorParamsArray = new ExpressionParameter[0];
+                EditorUtility.SetDirty(descriptorParams);
+                descriptorParams.parameters = RemoveCombinedExParameters(descriptorParams.parameters);
 
-            EditorUtility.SetDirty(descriptorParams);
-            descriptorParams.parameters = RemoveCombinedExParameters(descriptorParamsArray);
-
-            descriptorParamsProp.objectReferenceValue = descriptorParams;
+                descriptorParamsProp.objectReferenceValue = descriptorParams;
+            }
 
             // 変更を適用
             descriptorObj.ApplyModifiedProperties();
+        }
+
+        private static bool HasCombinedSupineMenu(ExpressionsMenu menu)
+        {
+            return menu != null && menu.controls != null && menu.controls.Any(IsCombinedSupineMenu);
+        }
+
+        private static bool HasOldSupineParameters(ExpressionParameters parameters)
+        {
+            return parameters != null && parameters.parameters != null && parameters.parameters.Any(IsSupineParameter);
         }
 
         private static List<ExpressionsMenuControl> RemoveCombinedExMenuControls(List<ExpressionsMenuControl> exMenuControls)

@@ -86,14 +86,12 @@ namespace Supine
         /// <param name="enableJumpAtDesktop">bool デスクトップでジャンプモーションを有効化</param>
         /// <param name="sittingPoseOrder1">int 座りポーズ1</param>
         /// <param name="sittingPoseOrder2">int 座りポーズ2</param>
-        /// <param name="shouldCleanCombinedSupine">bool 古いごろ寝システムを削除する</param>
         public void CreateMAPrefab(
             bool shouldInheritOriginalAnimation = true,
             bool disableJumpMotion = true,
             bool enableJumpAtDesktop = true,
             int sittingPoseOrder1 = 0,
-            int sittingPoseOrder2 = 1,
-            bool shouldCleanCombinedSupine = false
+            int sittingPoseOrder2 = 1
         )
         {
             if (canCombine)
@@ -126,9 +124,7 @@ namespace Supine
                 OldSupineCleaner.RemoveMarkerlessMAPrefabs(_avatar.transform, maPrefabInstance);
 
                 // 結合済みの古いごろ寝システムを削除
-                if (shouldCleanCombinedSupine) {
-                    OldSupineCleaner.CleanCombinedSupine(_avatarDescriptor);
-                }
+                OldSupineCleaner.CleanCombinedSupine(_avatarDescriptor);
 
                 Debug.Log("[VRCSupine] MA Prefab creation is done.");
             } else {

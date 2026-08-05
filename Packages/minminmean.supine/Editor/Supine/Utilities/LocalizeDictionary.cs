@@ -32,7 +32,6 @@ namespace Supine
             public string ma_prefab_created_message;
             public string ma_prefab_create_failure;
             public string ma_prefab_create_failure_message;
-            public string clean_combined_supine;
         }
     }
 }
