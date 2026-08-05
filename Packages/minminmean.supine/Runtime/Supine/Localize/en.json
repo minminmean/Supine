@@ -23,6 +23,5 @@
     "ma_prefab_created": "Prefab creation successful",
     "ma_prefab_created_message": "Created the Modular Avatar Prefab.",
     "ma_prefab_create_failure": "Prefab creation failure",
-    "ma_prefab_create_failure_message": "Modular Avatar Prefab creation is failure.\nPlease check the console log.",
-    "clean_combined_supine": "Clean old Supine (Lower v3.x)"
+    "ma_prefab_create_failure_message": "Modular Avatar Prefab creation is failure.\nPlease check the console log."
 }

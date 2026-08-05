@@ -140,6 +140,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3509859782431372602}
   - component: {fileID: 5353848233879069659}
+  - component: {fileID: 1003122840647800}
   m_Layer: 0
   m_Name: SupineMA
   m_TagString: Untagged
@@ -182,10 +183,22 @@ MonoBehaviour:
   pathMode: 1
   matchAvatarWriteDefaults: 0
   relativePathRoot:
-    referencePath: 
+    referencePath:
     targetObject: {fileID: 0}
   layerPriority: 0
   mergeAnimatorMode: 1
+--- !u!114 &1003122840647800
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2478647225827992499}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 142708bfabbdb1c002954da4c073039b, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
 --- !u!1 &2703358847003626822
 GameObject:
   m_ObjectHideFlags: 0

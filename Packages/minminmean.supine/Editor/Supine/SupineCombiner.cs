@@ -23,8 +23,6 @@ namespace Supine
         public bool canCombine = true;
 
         private string MmmAssetPath           = "Assets/MinMinMart";
-        private string SupineNormalPrefabName = "SupineMA";
-        private string SupineExPrefabName     = "SupineMA_EX";
         private string _maPrefabGuid    = Utility.GuidList.prefabs.normal;
         private string _controllerGuid  = Utility.GuidList.controllers.normal;
         private string _appVersion      = Utility.GetAppVersion();
@@ -88,14 +86,12 @@ namespace Supine
         /// <param name="enableJumpAtDesktop">bool デスクトップでジャンプモーションを有効化</param>
         /// <param name="sittingPoseOrder1">int 座りポーズ1</param>
         /// <param name="sittingPoseOrder2">int 座りポーズ2</param>
-        /// <param name="shouldCleanCombinedSupine">bool 古いごろ寝システムを削除する</param>
         public void CreateMAPrefab(
             bool shouldInheritOriginalAnimation = true,
             bool disableJumpMotion = true,
             bool enableJumpAtDesktop = true,
             int sittingPoseOrder1 = 0,
-            int sittingPoseOrder2 = 1,
-            bool shouldCleanCombinedSupine = false
+            int sittingPoseOrder2 = 1
         )
         {
             if (canCombine)
@@ -124,10 +120,11 @@ namespace Supine
                 // 設置済みのMAPrefabを整理
                 SortAndCleanMAPrefab(maPrefabInstance, alreadyPlacedPrefab);
 
+                // SupineMASlot導入以前に設置された、マーカーの無いMA Prefabの残骸を削除（互換対応）
+                OldSupineCleaner.RemoveMarkerlessMAPrefabs(_avatar.transform, maPrefabInstance);
+
                 // 結合済みの古いごろ寝システムを削除
-                if (shouldCleanCombinedSupine) {
-                    OldSupineCleaner.CleanCombinedSupine(_avatarDescriptor);
-                }
+                OldSupineCleaner.CleanCombinedSupine(_avatarDescriptor);
 
                 Debug.Log("[VRCSupine] MA Prefab creation is done.");
             } else {
@@ -220,10 +217,10 @@ namespace Supine
 
         /// <summary>
         /// 新しいMA Prefabと古いMA Prefabの位置を整理する
-        /// EX⇔通常版の入れ替えも行う
+        /// 他バリアント（EX⇔通常版など）の入れ替えも行う
         /// </summary>
         /// <param name="newPrefab">新しいMA Prefab</param>
-        /// <param name="oldPrefab">古いMA Prefab</param>
+        /// <param name="oldPrefab">古いMA Prefab（同バリアントの既存設置分）</param>
         private void SortAndCleanMAPrefab(GameObject newPrefab, GameObject oldPrefab)
         {
             bool indexReplaced = false;
@@ -235,8 +232,8 @@ namespace Supine
                 indexReplaced = true;
             }
 
-            GameObject otherSupinePrefab = _exMode ? GameObject.Find(SupineNormalPrefabName) : GameObject.Find(SupineExPrefabName);
-            if (otherSupinePrefab)
+            GameObject otherSupinePrefab = FindOtherSupineSlot(newPrefab);
+            if (otherSupinePrefab != null)
             {
                 if (!indexReplaced)
                 {
@@ -246,6 +243,24 @@ namespace Supine
 
                 GameObject.DestroyImmediate(otherSupinePrefab);
             }
+        }
+
+        /// <summary>
+        /// アバター直下から、自分（newPrefab）以外の設置済みごろ寝システムMA Prefabを探す。
+        /// バリアント名を直接知らなくても、SupineMASlotの有無だけで判定する。
+        /// </summary>
+        /// <param name="newPrefab">今回設置したMA Prefab</param>
+        private GameObject FindOtherSupineSlot(GameObject newPrefab)
+        {
+            foreach (Transform child in _avatar.transform)
+            {
+                if (child.gameObject == newPrefab) continue;
+                if (child.GetComponent<SupineMASlot>() != null)
+                {
+                    return child.gameObject;
+                }
+            }
+            return null;
         }
 
         /// <summary>

@@ -16,7 +16,6 @@ namespace Supine
         private bool _shouldInheritOriginalAnimation = true;
         private bool _disableJumpMotion = true;
         private bool _enableJumpAtDesktop = true;
-        private bool _shouldCleanCombinedSupine = true;
 
         private int _sittingPose1 = 0;
         private int _sittingPose2 = 1;
@@ -81,11 +80,6 @@ namespace Supine
 
             EditorGUILayout.Space();
 
-            // 結合済みのごろ寝を削除するか
-            _shouldCleanCombinedSupine = EditorGUILayout.ToggleLeft(localizeDict.clean_combined_supine, _shouldCleanCombinedSupine);
-
-            EditorGUILayout.Space();
-
             // Checkボタン
             using (new GUILayout.VerticalScope())
             {
@@ -121,8 +115,7 @@ namespace Supine
                                 disableJumpMotion: _disableJumpMotion,
                                 enableJumpAtDesktop: _enableJumpAtDesktop,
                                 sittingPoseOrder1: _sittingPose1,
-                                sittingPoseOrder2: _sittingPose2,
-                                shouldCleanCombinedSupine: _shouldCleanCombinedSupine
+                                sittingPoseOrder2: _sittingPose2
                             );
                         }
                         catch (IOException e)
