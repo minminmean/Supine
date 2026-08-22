@@ -12,6 +12,7 @@ namespace Supine
         {
             private static string _appVersion;
             private static string _appVersionEX;
+            private const string FallbackFileName = "Avatar";
             private static GuidDictionary _guidList = JsonHelper.GetGuidList();
 
             public static GuidDictionary GuidList
@@ -49,6 +50,22 @@ namespace Supine
                 }
 
                 return path;
+            }
+
+            public static string SanitizeFileName(string name)
+            {
+                if (string.IsNullOrEmpty(name)) return FallbackFileName;
+
+                string sanitized = name;
+                foreach (char invalidChar in Path.GetInvalidFileNameChars())
+                {
+                    sanitized = sanitized.Replace(invalidChar, '_');
+                }
+
+                // Windowsは末尾の空白とドットを扱えない
+                sanitized = sanitized.Trim().TrimEnd('.').Trim();
+
+                return string.IsNullOrEmpty(sanitized) ? FallbackFileName : sanitized;
             }
 
             public static void CreateFolderRecursively(string path)

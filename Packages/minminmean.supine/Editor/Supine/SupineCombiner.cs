@@ -42,7 +42,7 @@ namespace Supine
         public SupineCombiner(GameObject avatar, bool exMode = false)
         {
             _avatar = avatar;
-            _avatar_name_with_suffix = avatar.name;
+            _avatar_name_with_suffix = Utility.SanitizeFileName(avatar.name);
             _avatarDescriptor = avatar.GetComponent<VRCAvatarDescriptor>();
             _exMode = exMode;
             
