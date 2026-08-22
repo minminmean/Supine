@@ -105,7 +105,8 @@ namespace Supine
 
             private static string ReadTextFromGuid(string guid)
             {
-                return File.ReadAllText(AssetDatabase.GUIDToAssetPath(guid));
+                // 末尾の改行やBOMがパスに混入するとPath系APIが例外を投げるため必ず除去する
+                return File.ReadAllText(AssetDatabase.GUIDToAssetPath(guid)).Trim();
             }
         }
     }
