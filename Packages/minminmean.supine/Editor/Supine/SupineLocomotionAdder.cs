@@ -72,6 +72,7 @@ namespace Supine
 
         private readonly AnimatorCloneMap _map = new AnimatorCloneMap();
         private readonly SupineAddReport _report = new SupineAddReport();
+        private readonly AnimatorCloner _cloner;
 
         private AnimatorStateMachine _templateRoot;
         private AnimatorStateMachine _destinationRoot;
@@ -94,6 +95,7 @@ namespace Supine
             _destination        = destination;
             _templateAssetPath  = AssetDatabase.GetAssetPath(template);
             _stateNameOverrides = stateNameOverrides;
+            _cloner             = new AnimatorCloner(destination, _templateAssetPath, _map, _report.Warnings);
         }
 
         /// <summary>
@@ -281,7 +283,7 @@ namespace Supine
 
             CloneAuxiliaryLayers();
 
-            AnimatorCloneUtility.CloneTransitions(_map, _report.Warnings, LeadsToUntouchedNode);
+            _cloner.CloneTransitions(LeadsToUntouchedNode);
             RemoveConflictingLieDownTransitions();
             MergeAnchorTransitions();
 
@@ -485,9 +487,8 @@ namespace Supine
                     continue;
                 }
 
-                AnimatorState cloned = AnimatorCloneUtility.CloneState(
-                    templateState, destinationStateMachine, _destination, _templateAssetPath,
-                    child.position + _clonePositionOffset);
+                AnimatorState cloned = _cloner.CloneState(
+                    templateState, destinationStateMachine, child.position + _clonePositionOffset);
                 _map.RegisterClonedState(templateState, cloned);
             }
 
@@ -498,9 +499,8 @@ namespace Supine
 
                 if (DefaultLocomotionTable.IsDefaultStateMachineName(templateChild.name)) continue;
 
-                AnimatorCloneUtility.CloneStateMachine(
-                    templateChild, destinationStateMachine, _destination,
-                    _templateAssetPath, child.position + _clonePositionOffset, _map);
+                _cloner.CloneStateMachine(
+                    templateChild, destinationStateMachine, child.position + _clonePositionOffset);
             }
         }
 
@@ -530,7 +530,7 @@ namespace Supine
             AnimatorControllerLayer[] templateLayers = _template.layers;
             for (int i = 1; i < templateLayers.Length; i++)
             {
-                AnimatorCloneUtility.CloneLayer(templateLayers[i], _destination, _templateAssetPath, _map);
+                _cloner.CloneLayer(templateLayers[i]);
             }
         }
 
@@ -609,7 +609,7 @@ namespace Supine
 
                 foreach (AnimatorStateTransition transition in unmatched)
                 {
-                    AnimatorCloneUtility.CloneStateTransition(transition, pair.Value, _map, _report.Warnings);
+                    _cloner.CloneStateTransition(transition, pair.Value);
                 }
             }
 
@@ -620,7 +620,7 @@ namespace Supine
 
                 foreach (AnimatorStateTransition transition in unmatched)
                 {
-                    AnimatorCloneUtility.CloneAnyStateTransition(transition, pair.Value, _map, _report.Warnings);
+                    _cloner.CloneAnyStateTransition(transition, pair.Value);
                 }
             }
         }
