@@ -7,6 +7,7 @@ using UnityEditor.SceneManagement;
 using VRC.SDK3.Avatars.Components;
 
 using ModularAvatarMergeAnimator = nadena.dev.modular_avatar.core.ModularAvatarMergeAnimator;
+using MergeAnimatorMode = nadena.dev.modular_avatar.core.MergeAnimatorMode;
 using Supine.Utilities;
 
 namespace Supine
@@ -33,7 +34,7 @@ namespace Supine
         /// </summary>
         /// <param name="avatar">GameObject アバター</param>
         /// <param name="variant">SupineVariant 設置するバリアント（通常版 / EX版）</param>
-        /// <param name="versionFolderName">string 生成先フォルダ名（例: "Supine v4.4.0"）</param>
+        /// <param name="versionFolderName">string 生成先フォルダ名（例: "Supine v4.5.0"）</param>
         public SupineCombiner(GameObject avatar, SupineVariant variant, string versionFolderName)
         {
             _avatar = avatar;
@@ -64,20 +65,20 @@ namespace Supine
         }
 
         /// <summary>
+        /// 組込前の検証を行う。
+        /// 警告があっても組込自体は続行できるため、失敗と警告は分けて返す。
+        /// </summary>
+        /// <param name="options">SupineCombineOptions 組込オプション</param>
+        public SupineCheckResult Validate(SupineCombineOptions options)
+        {
+            return new SupineCombineValidator(_avatarDescriptor, _variant).Validate(options);
+        }
+
+        /// <summary>
         /// コントローラを編集してMA Prefabに差し込みavatar直下に設置
         /// </summary>
-        /// <param name="shouldInheritOriginalAnimation">bool 歩行アニメーションの継承</param>
-        /// <param name="disableJumpMotion">bool ジャンプモーションの無効</param>
-        /// <param name="enableJumpAtDesktop">bool デスクトップでジャンプモーションを有効化</param>
-        /// <param name="sittingPose1">SittingPose 座りポーズ1</param>
-        /// <param name="sittingPose2">SittingPose 座りポーズ2</param>
-        public void CreateMAPrefab(
-            bool shouldInheritOriginalAnimation = true,
-            bool disableJumpMotion = true,
-            bool enableJumpAtDesktop = true,
-            SittingPose sittingPose1 = SittingPose.Petan,
-            SittingPose sittingPose2 = SittingPose.TatehizaGirl
-        )
+        /// <param name="options">SupineCombineOptions 組込オプション</param>
+        public void CreateMAPrefab(SupineCombineOptions options)
         {
             if (!CanCombine)
             {
@@ -91,16 +92,28 @@ namespace Supine
             int undoGroup = Undo.GetCurrentGroup();
             Undo.SetCurrentGroupName("Create Supine MA Prefab");
 
-            // オプションに従ってLocomotionを編集
-            AnimatorController supineLocomotion = CopyAssetFromGuid<AnimatorController>(_variant.controller);
+            // オプションに従ってLocomotionを用意
+            IReadOnlyDictionary<string, string> renamedStates = new Dictionary<string, string>();
+            AnimatorController supineLocomotion = options.mode == SupineCombineMode.Add
+                ? BuildAddedLocomotion(options, out renamedStates)
+                : BuildStandardLocomotion(options);
 
-            if (shouldInheritOriginalAnimation)
+            if (supineLocomotion == null)
             {
-                AnimatorController originalLocomotion = _avatarDescriptor.baseAnimationLayers[0].animatorController as AnimatorController;
-                InheritOriginalAnimation(supineLocomotion, originalLocomotion);
+                Debug.LogError("[VRCSupine] Could not create MA Prefab.");
+                return;
             }
-            ToggleJumpMotion(supineLocomotion, !disableJumpMotion, enableJumpAtDesktop);
-            SetSittingAnimations(supineLocomotion, sittingPose1, sittingPose2);
+
+            // ジャンプのオプションはごろ寝システムのアニメーターに手を入れるためのもの。
+            // 追加モードでは既存のジャンプ・落下の挙動をそのまま残すので触らない。
+            if (options.ShouldApplyJumpOptions)
+            {
+                ToggleJumpMotion(supineLocomotion, !options.disableJumpMotion, options.enableJumpAtDesktop);
+            }
+            SetSittingAnimations(supineLocomotion, options.sittingPose1, options.sittingPose2, renamedStates);
+
+            EditorUtility.SetDirty(supineLocomotion);
+            AssetDatabase.SaveAssets();
 
             // 設置済みのごろ寝システムMA Prefabを、新しいものを置く前に集めておく
             List<GameObject> oldPrefabs = FindPlacedSupinePrefabs();
@@ -113,6 +126,14 @@ namespace Supine
 
             ModularAvatarMergeAnimator component = maPrefabInstance.GetComponents<ModularAvatarMergeAnimator>()[0];
             component.animator = supineLocomotion;
+
+            // 追加モードの生成物はアバターのBaseレイヤーを丸ごと含むため、
+            // 追記(Append)にすると元のレイヤーと二重に走ってしまう。
+            // Replaceにすると元のレイヤー順・マスク・レイヤー参照がそのまま生成物側で保たれる。
+            component.mergeAnimatorMode = options.mode == SupineCombineMode.Add
+                ? MergeAnimatorMode.Replace
+                : MergeAnimatorMode.Append;
+
             EditorUtility.SetDirty(component);
 
             // 設置済みのMA Prefabを整理
@@ -128,28 +149,131 @@ namespace Supine
         }
 
         /// <summary>
-        /// 歩行モーションを継承する
+        /// 従来方式。ごろ寝システムのテンプレートをコピーして使う。
+        /// </summary>
+        private AnimatorController BuildStandardLocomotion(SupineCombineOptions options)
+        {
+            AnimatorController supineLocomotion = CopyAssetFromGuid<AnimatorController>(_variant.controller);
+
+            if (options.ShouldInherit)
+            {
+                InheritOriginalAnimation(
+                    supineLocomotion, BaseAnimatorResolver.FindBaseLayerController(_avatarDescriptor), options);
+            }
+
+            return supineLocomotion;
+        }
+
+        /// <summary>
+        /// 追加方式。既存アニメーターのコピーへ、ごろ寝システムのステート群を追加する。
+        /// </summary>
+        private AnimatorController BuildAddedLocomotion(
+            SupineCombineOptions options, out IReadOnlyDictionary<string, string> renamedStates)
+        {
+            renamedStates = new Dictionary<string, string>();
+
+            BaseAnimatorResolution resolution =
+                BaseAnimatorResolver.Resolve(_avatarDescriptor, options.EffectiveAddTargetOverride);
+
+            if (!resolution.IsValid)
+            {
+                Debug.LogError("[VRCSupine] Could not resolve the animator to add the Supine states to.");
+                return null;
+            }
+
+            if (resolution.source == BaseAnimatorSource.VrcDefault)
+            {
+                Debug.Log(
+                    "[VRCSupine] The avatar has no animator on its Base layer. " +
+                    "Using the VRChat default locomotion as the target.");
+            }
+
+            AnimatorController template = _variant.LoadController();
+            if (template == null)
+            {
+                Debug.LogError("[VRCSupine] Could not load the Supine template controller.");
+                return null;
+            }
+
+            // 元のアセットは絶対に書き換えない。必ずコピーへ追加する
+            AnimatorController generated = CopyAssetFromController(resolution.controller);
+
+            SupineAddReport report = new SupineLocomotionAdder(
+                template, generated, SupineLocomotionAdder.BuildStateNameOverrides(options)).Add();
+            foreach (string warning in report.Warnings)
+            {
+                Debug.LogWarning("[VRCSupine] " + warning);
+            }
+
+            if (!report.Succeeded)
+            {
+                Debug.LogError("[VRCSupine] Could not add the Supine states to the target animator.");
+
+                // 中途半端なコピーを残すと、生成先フォルダが埋まって次回の連番がずれる
+                DiscardGeneratedAsset(generated);
+                return null;
+            }
+
+            renamedStates = report.RenamedStates;
+            return generated;
+        }
+
+        /// <summary>
+        /// 生成に失敗したアセットを片付ける。空になった生成先フォルダも畳む。
+        /// </summary>
+        private void DiscardGeneratedAsset(Object asset)
+        {
+            if (asset == null) return;
+
+            string generatedDirPath = MakeGeneratedDirPath();
+            string assetPath = AssetDatabase.GetAssetPath(asset);
+
+            // 生成先フォルダの中身以外は絶対に消さない
+            if (string.IsNullOrEmpty(assetPath) || !assetPath.StartsWith(generatedDirPath + "/")) return;
+
+            AssetDatabase.DeleteAsset(assetPath);
+
+            if (AssetDatabase.IsValidFolder(generatedDirPath) &&
+                AssetDatabase.FindAssets(string.Empty, new[] { generatedDirPath }).Length == 0)
+            {
+                AssetDatabase.DeleteAsset(generatedDirPath);
+            }
+        }
+
+        /// <summary>
+        /// 歩行モーションを継承する。
+        /// 継承元のステートは名前一致で探すが、オプションで指定があればそちらを優先する。
         /// </summary>
         /// <param name="supineLocomotion">ごろ寝システムのBaseコントローラ</param>
         /// <param name="originalLocomotion">オリジナルのBaseコントローラ</param>
-        private void InheritOriginalAnimation(AnimatorController supineLocomotion, AnimatorController originalLocomotion)
+        /// <param name="options">SupineCombineOptions 組込オプション</param>
+        private void InheritOriginalAnimation(
+            AnimatorController supineLocomotion, AnimatorController originalLocomotion, SupineCombineOptions options)
         {
             // 元のLocomotionが無ければ何もしない
             if (originalLocomotion == null) return;
+            if (originalLocomotion.layers.Length == 0 || originalLocomotion.layers[0].stateMachine == null) return;
 
-            // statesを取り出し
             ChildAnimatorState[] supineLocomotionStates = supineLocomotion.layers[0].stateMachine.states;
-            ChildAnimatorState[] originalLocomotionStates = originalLocomotion.layers[0].stateMachine.states;
+
+            // 継承元はサブステートマシンに入っていることもあるので再帰的に引く
+            Dictionary<string, AnimatorState> originalStates =
+                AnimatorStateUtility.BuildStateIndex(originalLocomotion.layers[0].stateMachine);
 
             // モーション上書き
-            foreach (string stateName in new[] { "Standing", "Crouching", "Prone" })
+            foreach (string templateStateName in InheritedStateTable.TemplateStateNames)
             {
-                AnimatorState original = AnimatorStateUtility.FindAnimatorStateByName(originalLocomotionStates, stateName);
-                AnimatorState supine   = AnimatorStateUtility.FindAnimatorStateByName(supineLocomotionStates, stateName);
-                if (original != null && supine != null)
-                {
-                    supine.motion = original.motion;
-                }
+                AnimatorState supine =
+                    AnimatorStateUtility.FindAnimatorStateByName(supineLocomotionStates, templateStateName);
+                if (supine == null) continue;
+
+                // 指定が空なら継承しない。ごろ寝システムに元から入っているアニメーションが残る
+                if (!InheritedStateTable.TryResolveSourceStateName(
+                        options, templateStateName, out string sourceStateName)) continue;
+
+                if (!originalStates.TryGetValue(sourceStateName, out AnimatorState original)) continue;
+
+                supine.motion = original.motion;
             }
         }
 
@@ -183,14 +307,28 @@ namespace Supine
         /// <param name="supineLocomotion">ごろ寝システムのBaseコントローラ</param>
         /// <param name="sittingPose1">SittingPose 座りポーズ1</param>
         /// <param name="sittingPose2">SittingPose 座りポーズ2</param>
-        private void SetSittingAnimations(AnimatorController supineLocomotion, SittingPose sittingPose1, SittingPose sittingPose2)
+        /// <param name="renamedStates">追加時にリネームされたステートの対応表</param>
+        private void SetSittingAnimations(
+            AnimatorController supineLocomotion,
+            SittingPose sittingPose1,
+            SittingPose sittingPose2,
+            IReadOnlyDictionary<string, string> renamedStates)
         {
             // statesを取り出し
             ChildAnimatorState[] supineLocomotionStates = supineLocomotion.layers[0].stateMachine.states;
 
             // 座りアニメーションを変更
-            SetSittingAnimation(supineLocomotionStates, "Sit 1", sittingPose1);
-            SetSittingAnimation(supineLocomotionStates, "Sit 2", sittingPose2);
+            SetSittingAnimation(supineLocomotionStates, ResolveStateName("Sit 1", renamedStates), sittingPose1);
+            SetSittingAnimation(supineLocomotionStates, ResolveStateName("Sit 2", renamedStates), sittingPose2);
+        }
+
+        /// <summary>
+        /// 追加時に名前が衝突してリネームされている場合、生成物での実名を返す
+        /// </summary>
+        private static string ResolveStateName(string name, IReadOnlyDictionary<string, string> renamedStates)
+        {
+            if (renamedStates != null && renamedStates.TryGetValue(name, out string renamed)) return renamed;
+            return name;
         }
 
         private void SetSittingAnimation(ChildAnimatorState[] states, string stateName, SittingPose pose)
@@ -257,7 +395,20 @@ namespace Supine
         private T CopyAssetFromGuid<T>(string guid) where T : Object
         {
             string templatePath = AssetDatabase.GUIDToAssetPath(guid);
-            string templateName = Path.GetFileName(templatePath);
+            return CopyAssetFrom<T>(templatePath);
+        }
+
+        /// <summary>
+        /// 追加先コントローラを生成先フォルダへコピーする
+        /// </summary>
+        private AnimatorController CopyAssetFromController(AnimatorController source)
+        {
+            return CopyAssetFrom<AnimatorController>(AssetDatabase.GetAssetPath(source));
+        }
+
+        private T CopyAssetFrom<T>(string templatePath) where T : Object
+        {
+            string templateName = AssetPathUtility.SanitizeFileName(Path.GetFileName(templatePath));
             string destinationPath = MakeGeneratedDirPath() + "/" + _avatarNameWithSuffix + "_" + templateName;
 
             return AssetPathUtility.CopyAssetFromPath<T>(templatePath, destinationPath);
