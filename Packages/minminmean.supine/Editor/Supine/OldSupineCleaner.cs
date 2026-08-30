@@ -22,7 +22,7 @@ namespace Supine
         private const string LegacyNormalPrefabName = "SupineMA";
         private const string LegacyExPrefabName     = "SupineMA_EX";
 
-        private static ExpressionParameter[] _oldSupineParameters = new ExpressionParameter[11]
+        private static readonly ExpressionParameter[] OldSupineParameters =
             {
                 new ExpressionParameter { name = "VRCLockPose",                 valueType = ExpressionParameters.ValueType.Int },
                 new ExpressionParameter { name = "VRCFootAnchor",               valueType = ExpressionParameters.ValueType.Int },
@@ -109,33 +109,19 @@ namespace Supine
 
         private static bool IsSupineParameter(ExpressionParameter parameter)
         {
-            return _oldSupineParameters.Contains(parameter, new ExParameterComparer());
+            return OldSupineParameters.Contains(parameter, ExParameterComparer.Instance);
         }
 
         /// <summary>
-        /// SupineMASlot導入以前（マーカーの無い）に設置された通常版/EX版のMA Prefabを削除する。
-        /// マーカーが無いため通常のSortAndCleanMAPrefabでは検出できない、
+        /// SupineMASlot導入以前（マーカーの無い）に設置された通常版/EX版のMA Prefabか判定する。
+        /// マーカーが無いためSupineMASlotでは検出できない、
         /// バージョン跨ぎでの入れ替え時の残骸を掃除するための互換対応。
         /// </summary>
-        /// <param name="avatarTransform">アバターのTransform</param>
-        /// <param name="excluding">削除対象から除外する（今回新しく設置した）MA Prefab</param>
-        public static void RemoveMarkerlessMAPrefabs(Transform avatarTransform, GameObject excluding)
+        /// <param name="child">アバター直下の子オブジェクト</param>
+        public static bool IsMarkerlessMAPrefab(Transform child)
         {
-            List<GameObject> targets = new List<GameObject>();
-            foreach (Transform child in avatarTransform)
-            {
-                if (child.gameObject == excluding) continue;
-                bool isKnownMAPrefabName = child.name == LegacyNormalPrefabName || child.name == LegacyExPrefabName;
-                if (isKnownMAPrefabName && child.GetComponent<SupineMASlot>() == null)
-                {
-                    targets.Add(child.gameObject);
-                }
-            }
-
-            foreach (GameObject target in targets)
-            {
-                GameObject.DestroyImmediate(target);
-            }
+            bool isKnownMAPrefabName = child.name == LegacyNormalPrefabName || child.name == LegacyExPrefabName;
+            return isKnownMAPrefabName && child.GetComponent<SupineMASlot>() == null;
         }
     }
 }

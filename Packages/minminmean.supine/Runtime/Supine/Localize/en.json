@@ -1,6 +1,5 @@
 {
     "check": "Check",
-    "combine": "Combine\n(Conventional)",
     "inherit_original": "Inherit original standard animations",
     "disable_jump_motion": "Disable jump and fall animations",
     "enable_jump_at_desktop": "Enable jump motion at desktop mode",
@@ -15,10 +14,6 @@
     "check_successful_message": "Check is successful.\nThen click Create button to create and place MA Prefab.",
     "check_failure": "Check failure",
     "check_failure_message": "Cannot combine.\nThis is not avatar object.",
-    "combine_successful": "Combine successful",
-    "combine_successful_message": "Combined!",
-    "combine_failure": "Combine failure",
-    "combine_failure_message": "Cannot combine.",
     "create_ma_prefab": "Create\nModular Avatar Prefab",
     "ma_prefab_created": "Prefab creation successful",
     "ma_prefab_created_message": "Created the Modular Avatar Prefab.",

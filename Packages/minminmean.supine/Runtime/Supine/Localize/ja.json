@@ -1,6 +1,5 @@
 {
     "check": "検証",
-    "combine": "結合\n（従来・破壊的）",
     "inherit_original": "元のアニメーションを継承（立ち、しゃがみ、伏せ）",
     "disable_jump_motion": "ジャンプ・落下時のアニメーションを無効にする",
     "enable_jump_at_desktop": "デスクトップモード時は有効にする",
@@ -15,10 +14,6 @@
     "check_successful_message": "検証に成功しました。\n生成ボタンを押すと組込を行います。",
     "check_failure": "検証失敗",
     "check_failure_message": "ごろ寝システムを組込できません。\nアバターではありません。",
-    "combine_successful": "結合成功",
-    "combine_successful_message": "結合に成功しました。",
-    "combine_failure": "結合失敗",
-    "combine_failure_message": "ごろ寝システムを結合できませんでした。",
     "create_ma_prefab": "Modular Avatar\n Prefabを生成",
     "ma_prefab_created": "Prefab生成成功",
     "ma_prefab_created_message": "Modular Avatar Prefabを生成しました。",
