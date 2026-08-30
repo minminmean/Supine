@@ -1,4 +1,6 @@
 using System;
+using UnityEditor;
+using UnityEditor.Animations;
 
 namespace Supine.Utilities
 {
@@ -14,6 +16,17 @@ namespace Supine.Utilities
     {
         public SupineVariant variant;
         public Animations animations;
+        public VRChat vrchat;
+
+        /// <summary>
+        /// VRChat SDKが持つアセットのGUID。
+        /// バリアント間で共通のため、ごろ寝システム本体の guids.json だけが持つ。
+        /// </summary>
+        [Serializable]
+        public struct VRChat
+        {
+            public string default_locomotion;
+        }
 
         [Serializable]
         public struct Animations
@@ -42,5 +55,16 @@ namespace Supine.Utilities
         public string controller;
 
         public bool IsValid => !string.IsNullOrEmpty(prefab) && !string.IsNullOrEmpty(controller);
+
+        /// <summary>
+        /// このバリアントのテンプレートコントローラを読む。読めなければ null。
+        /// 読むだけで、このアセットを書き換えてはいけない。
+        /// </summary>
+        public AnimatorController LoadController()
+        {
+            string path = AssetDatabase.GUIDToAssetPath(controller);
+            if (string.IsNullOrEmpty(path)) return null;
+            return AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
+        }
     }
 }

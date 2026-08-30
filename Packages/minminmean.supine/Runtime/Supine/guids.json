@@ -14,5 +14,10 @@
             "agura":            "7763fb4ad4e8be942861867e99e04deb",
             "tatehiza_boy":     "1e0291513c4de5e4c8c210f788354cba"
         }
+    },
+
+    "vrchat":
+    {
+        "default_locomotion":   "4e4e1a372a526074884b7311d6fc686b"
     }
 }
