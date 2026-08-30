@@ -5,6 +5,9 @@ namespace Supine
 {
     class ExParameterComparer : IEqualityComparer<ExpressionParameter>
     {
+        /// <summary>要素ごとに生成しないよう使い回す</summary>
+        public static readonly ExParameterComparer Instance = new ExParameterComparer();
+
         public bool Equals(ExpressionParameter x, ExpressionParameter y)
         {
             return x.name == y.name && x.valueType == y.valueType;

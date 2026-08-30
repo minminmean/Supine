@@ -1,76 +1,46 @@
 using System;
 
-namespace Supine
+namespace Supine.Utilities
 {
-    namespace Utilities
+    /// <summary>
+    /// 各パッケージが持つ guids.json のスキーマ。
+    /// バリアント（通常版 / EX版）はそれぞれ自分のパッケージ内の guids.json に
+    /// variant ノードを持ち、そこから自分用のPrefabとコントローラを指す。
+    /// JsonUtilityは欠けたフィールドを既定値にするため、
+    /// EX版のようにvariantしか持たないJSONも同じ構造体で読める。
+    /// </summary>
+    [Serializable]
+    public struct GuidDictionary
     {
+        public SupineVariant variant;
+        public Animations animations;
+
         [Serializable]
-        public struct GuidDictionary
+        public struct Animations
         {
-            public Animations animations; 
-            public Controllers controllers;
-            public Prefabs prefabs;
-            public AppVersions app_versions;
+            public Sitting sitting;
 
             [Serializable]
-            public struct Animations
+            public struct Sitting
             {
-                public Sitting sitting;
-                public Sleeping sleeping;
-                public EX ex;
-
-                [Serializable]
-                public struct Sitting
-                {
-                    public string petan;
-                    public string tatehiza_girl;
-                    public string agura;
-                    public string tatehiza_boy;
-                }
-                
-                [Serializable]
-                public struct Sleeping
-                {
-                    public string supine;
-                    public string supine_r;
-                    public string supine_l;
-                    public string side_sleep;
-                    public string side_sleep_c;
-                    public string side_sleep_rev;
-                }
-
-                [Serializable]
-                public struct EX
-                {
-                    public string mji;
-                    public string disk;
-                    public string kji;
-                    public string kji_znk;
-                    public string snk;
-                    public string srag;
-                }
-            }
-
-            [Serializable]
-            public struct Controllers
-            {
-                public string normal;
-                public string ex;                
-            }
-
-            [Serializable]
-            public struct Prefabs
-            {
-                public string normal;
-                public string ex;
-            }
-
-            [Serializable]
-            public struct AppVersions
-            {
-                public string normal;
-                public string ex;
+                public string petan;
+                public string tatehiza_girl;
+                public string agura;
+                public string tatehiza_boy;
             }
         }
+    }
+
+    /// <summary>
+    /// ごろ寝システム1バリアントを構成するアセットのGUID。
+    /// バージョン文字列はパッケージの package.json から取得するため、ここには含めない。
+    /// </summary>
+    [Serializable]
+    public struct SupineVariant
+    {
+        public string prefab;
+        public string controller;
+
+        public bool IsValid => !string.IsNullOrEmpty(prefab) && !string.IsNullOrEmpty(controller);
     }
 }
