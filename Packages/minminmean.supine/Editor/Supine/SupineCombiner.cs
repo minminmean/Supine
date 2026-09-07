@@ -34,7 +34,7 @@ namespace Supine
         /// </summary>
         /// <param name="avatar">GameObject アバター</param>
         /// <param name="variant">SupineVariant 設置するバリアント（通常版 / EX版）</param>
-        /// <param name="versionFolderName">string 生成先フォルダ名（例: "Supine v4.5.0"）</param>
+        /// <param name="versionFolderName">string 生成先フォルダ名（例: "Supine v4.5.1"）</param>
         public SupineCombiner(GameObject avatar, SupineVariant variant, string versionFolderName)
         {
             _avatar = avatar;
@@ -127,12 +127,13 @@ namespace Supine
             ModularAvatarMergeAnimator component = maPrefabInstance.GetComponents<ModularAvatarMergeAnimator>()[0];
             component.animator = supineLocomotion;
 
-            // 追加モードの生成物はアバターのBaseレイヤーを丸ごと含むため、
+            // どちらのモードでも、生成物はBaseレイヤーそのものになる。
+            // 従来モードはごろ寝システムのLocomotion一式、追加モードはアバターのBaseレイヤーを丸ごと含むので、
             // 追記(Append)にすると元のレイヤーと二重に走ってしまう。
+            // 従来モードでこれをやると、元のアニメーターに残ったJumpAndFallが
+            // EnableJumpMotionで塞がれないまま動き、ジャンプ・落下の無効化が効かなくなる。
             // Replaceにすると元のレイヤー順・マスク・レイヤー参照がそのまま生成物側で保たれる。
-            component.mergeAnimatorMode = options.mode == SupineCombineMode.Add
-                ? MergeAnimatorMode.Replace
-                : MergeAnimatorMode.Append;
+            component.mergeAnimatorMode = MergeAnimatorMode.Replace;
 
             EditorUtility.SetDirty(component);
 
