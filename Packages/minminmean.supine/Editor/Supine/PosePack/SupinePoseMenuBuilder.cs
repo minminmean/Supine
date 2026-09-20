@@ -37,6 +37,9 @@ namespace Supine.PosePack
         /// <summary>各パックのメニュー末尾に添える項目。既存のものを複製して使う</summary>
         private const string FootAnchorName = "Foot Anchor";
 
+        /// <summary>姿勢の微調整を回すラジアル。Foot Anchor の手前に置く</summary>
+        private const string PoseAdjustName = "Pose Adjust";
+
         public static void Build(
             GameObject maPrefabInstance, IReadOnlyList<ResolvedPose> poses, List<string> warnings)
         {
@@ -54,6 +57,7 @@ namespace Supine.PosePack
             // 置き場所ごとにまとめる。EX版のように既存のサブメニュー名を名乗れば、そこへ合流する
             List<string> folderOrder = new List<string>();
             Dictionary<string, List<ResolvedPose>> folders = new Dictionary<string, List<ResolvedPose>>();
+            HashSet<string> adjustFolders = new HashSet<string>();
 
             foreach (ResolvedPose pose in poses)
             {
@@ -65,6 +69,9 @@ namespace Supine.PosePack
                     folderOrder.Add(folder);
                 }
                 group.Add(pose);
+
+                // 同じメニューへ合流したパックのうち、1つでも宣言していれば出す
+                if (pose.Pack.poseAdjust) adjustFolders.Add(folder);
             }
 
             // 雛形は自分で作った複製を拾わないよう、1つも生やす前に確保しておく
@@ -79,7 +86,7 @@ namespace Supine.PosePack
             foreach (string folder in folderOrder)
             {
                 Transform submenu = FindChild(posesRoot, folder) ?? CreateSubMenu(posesRoot, folder);
-                FillPages(submenu, folders[folder], footAnchor, warnings);
+                FillPages(submenu, folders[folder], adjustFolders.Contains(folder), footAnchor, warnings);
             }
 
             // パックを足したぶん Misc が押し出されるので、末尾へ送り直す
@@ -103,19 +110,22 @@ namespace Supine.PosePack
         /// サブメニューへ項目を並べる。上限を超える分は「Next」で次ページへ送る。
         /// 黙って切り捨てると、買ったポーズがメニューに出てこないという形で現れる。
         ///
-        /// Foot Anchor はどのページの末尾にも置く。ページを送った先で使えないと、
-        /// 足を固定するためだけに前のページへ戻ることになる。
-        /// 並びは「ポーズ … / Foot Anchor / Next」。
+        /// Pose Adjust と Foot Anchor はどのページの末尾にも置く。ページを送った先で
+        /// 使えないと、足を固定するためだけに前のページへ戻ることになる。
+        /// 並びは「ポーズ … / Pose Adjust / Foot Anchor / Next」。
         /// </summary>
         private static void FillPages(
-            Transform page, List<ResolvedPose> poses, GameObject footAnchor, List<string> warnings)
+            Transform page, List<ResolvedPose> poses,
+            bool withAdjust, GameObject footAnchor, List<string> warnings)
         {
+            // 末尾に必ず付く項目の数
+            int trailing = (withAdjust ? 1 : 0) + (footAnchor != null ? 1 : 0);
             int index = 0;
 
             while (true)
             {
-                // 末尾の Foot Anchor のぶんを先に引く
-                int capacity = MenuCapacity - page.childCount - 1;
+                // 末尾に付くぶんを先に引く
+                int capacity = MenuCapacity - page.childCount - trailing;
                 int remaining = poses.Count - index;
 
                 // 収まらないなら、送りのぶんもさらに1枠要る
@@ -137,6 +147,7 @@ namespace Supine.PosePack
                 }
                 index += count;
 
+                if (withAdjust) CreatePoseAdjust(page);
                 if (footAnchor != null) CopyItem(footAnchor, page);
 
                 if (index >= poses.Count) return;
@@ -149,6 +160,43 @@ namespace Supine.PosePack
         /// 既存のメニュー項目をそのまま複製して足す。
         /// 作り直すとアイコンや同期の設定を書き写すことになり、元を直したときにずれる。
         /// </summary>
+        /// <summary>
+        /// 姿勢の微調整を回すラジアル。
+        /// ポーズのクリップに2つ以上キーがあると、その間をこの軸でスクラブできる。
+        /// </summary>
+        private static void CreatePoseAdjust(Transform parent)
+        {
+            GameObject go = new GameObject(PoseAdjustName);
+            Undo.RegisterCreatedObjectUndo(go, "Create Supine Pose Menu");
+            go.transform.SetParent(parent, false);
+
+            ModularAvatarMenuItem item = Undo.AddComponent<ModularAvatarMenuItem>(go);
+            item.Control = new VRCExpressionsMenu.Control
+            {
+                name = PoseAdjustName,
+                type = VRCExpressionsMenu.Control.ControlType.RadialPuppet,
+
+                // 開いている間だけ立つフラグが本体で、回す軸は subParameters 側
+                parameter = new VRCExpressionsMenu.Control.Parameter
+                    { name = SupinePoseInjector.AdjustingParameter },
+                value = 1f,
+                subParameters = new[]
+                {
+                    new VRCExpressionsMenu.Control.Parameter { name = SupinePoseInjector.AdjustParameter },
+                },
+                labels = new VRCExpressionsMenu.Control.Label[0],
+            };
+
+            // EX版が持っていた Ex Adjust と同じ設定にする
+            item.MenuSource = SubmenuSource.Children;
+            item.isSynced = true;
+            item.isSaved = true;
+            item.isDefault = false;
+            item.automaticValue = true;
+
+            EditorUtility.SetDirty(item);
+        }
+
         private static void CopyItem(GameObject template, Transform parent)
         {
             GameObject copy = Object.Instantiate(template, parent);

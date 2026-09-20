@@ -98,6 +98,15 @@ namespace Supine
         /// </summary>
         public string menuFolderName = string.Empty;
 
+        /// <summary>
+        /// このパックのメニューに Pose Adjust（調整のラジアル）を置くか。
+        ///
+        /// クリップにキーを2つ以上持たせたポーズは、その間をスクラブして姿勢を変えられる。
+        /// 置き場所は Foot Anchor の手前で固定。
+        /// キーが1つしかないポーズだけのパックで出しても回すものが無いので、既定は無し。
+        /// </summary>
+        public bool poseAdjust;
+
         public SupinePoseEntry[] poses = new SupinePoseEntry[0];
 
         public string ResolvePackId()

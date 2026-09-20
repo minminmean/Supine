@@ -20,7 +20,11 @@ namespace Supine.PosePack
     {
         public const string PoseParameter = "VRCSupine";
 
-        private const string AdjustParameter = "VRCSupineExAdjust";
+        /// <summary>クリップのキーの間をスクラブする軸。メニュー側もこれを回す</summary>
+        public const string AdjustParameter = "VRCSupineExAdjust";
+
+        /// <summary>調整中であることを示すフラグ。ラジアルを開いている間だけ立つ</summary>
+        public const string AdjustingParameter = "VRCSupineExAdjusting";
         private const string UprightParameter = "Upright";
         private const string LockPoseParameter = "VRCLockPose";
         private const string PoseChangedParameter = "PoseChanged";
