@@ -153,8 +153,21 @@ namespace Supine.PosePack
             return values;
         }
 
+        /// <summary>
+        /// 番号を押さえているのはポーズそのものなので、ポーズへ向かう遷移だけを数える。
+        ///
+        /// 条件に VRCSupine が出てくる遷移を全部数えると、振り分けの行まで拾ってしまう。
+        /// テンプレートのコントローラには EX のポーズ番号を書いた行が残っており、
+        /// それを使用中と見なすと、パックが希望した番号が理由もなく弾かれる。
+        ///
+        /// ポーズのステートはモーションを持ち、振り分け先（Prepare Animation /
+        /// Prepare Tracking / Set Current Pose など）は持たない。そこで見分ける。
+        /// </summary>
         private static void CollectUsedSupineValues(AnimatorStateTransition transition, HashSet<int> values)
         {
+            if (transition.destinationState == null) return;
+            if (transition.destinationState.motion == null) return;
+
             foreach (AnimatorCondition condition in transition.conditions)
             {
                 if (condition.parameter != SupinePoseInjector.PoseParameter) continue;
