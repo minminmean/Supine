@@ -18,7 +18,7 @@ namespace Supine.PosePack
         /// <summary>パックが置き場所を指定しなかったときの既定のサブメニュー名</summary>
         public const string DefaultMenuFolderName = "Pose Packs";
 
-        private const string PosesMenuName = "Poses";
+        private const string PosesMenuName = "Supine Poses";
 
         /// <summary>VRChatの1メニューあたりの項目数上限</summary>
         private const int MenuCapacity = 8;

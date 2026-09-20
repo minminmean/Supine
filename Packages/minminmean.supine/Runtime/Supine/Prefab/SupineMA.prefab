@@ -213,7 +213,7 @@ GameObject:
   - component: {fileID: 1570438061597632461}
   - component: {fileID: 2853320893248777287}
   m_Layer: 0
-  m_Name: Poses
+  m_Name: Supine Poses
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -256,7 +256,7 @@ MonoBehaviour:
     UpdatedAtVersion: 
     MinimumVersion: 
   Control:
-    name: Poses
+    name: Supine Poses
     icon: {fileID: 2800000, guid: 4eac21cb343714f4f985cbe7668a1bc4, type: 3}
     type: 103
     parameter:
