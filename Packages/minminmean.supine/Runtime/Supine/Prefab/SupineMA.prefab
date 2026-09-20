@@ -121,7 +121,7 @@ MonoBehaviour:
     MinimumVersion: 1.18.0
   Control:
     name: Crouch Poses
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 956168d6168c4b44bb647f51f052ec15, type: 3}
     type: 103
     parameter:
       name: 
@@ -186,7 +186,7 @@ MonoBehaviour:
     MinimumVersion: 1.18.0
   Control:
     name: Air Chair (F)
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 3a54666434764725ab9f7eccaa44d1de, type: 3}
     type: 102
     parameter:
       name: CrouchPose
@@ -645,7 +645,7 @@ MonoBehaviour:
     MinimumVersion: 1.18.0
   Control:
     name: Air Chair Cross (F)
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: b6409f55331544afa5e69092fd14de9b, type: 3}
     type: 102
     parameter:
       name: CrouchPose
@@ -809,7 +809,7 @@ MonoBehaviour:
     MinimumVersion: 1.18.0
   Control:
     name: Air Chair Cross (M)
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 7ad0f642c0e444c6b490c60816a48f45, type: 3}
     type: 102
     parameter:
       name: CrouchPose
@@ -874,7 +874,7 @@ MonoBehaviour:
     MinimumVersion: 1.18.0
   Control:
     name: Kneel (F)
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 67133ba2d8d243e4a94d4a2fed608e24, type: 3}
     type: 102
     parameter:
       name: CrouchPose
@@ -1004,7 +1004,7 @@ MonoBehaviour:
     MinimumVersion: 1.18.0
   Control:
     name: Air Chair (M)
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 7e8eb0284a8940f2897d3b0663a8de85, type: 3}
     type: 102
     parameter:
       name: CrouchPose
@@ -1417,7 +1417,7 @@ MonoBehaviour:
     MinimumVersion: 1.18.0
   Control:
     name: Default
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 87e13ceb8a54461f8ccea18615602f7a, type: 3}
     type: 102
     parameter:
       name: CrouchPose
@@ -1612,7 +1612,7 @@ MonoBehaviour:
     MinimumVersion: 1.18.0
   Control:
     name: Kneel (M)
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: a56d14ac7fa44064b9994885b2637509, type: 3}
     type: 102
     parameter:
       name: CrouchPose
@@ -1681,7 +1681,7 @@ MonoBehaviour:
     MinimumVersion: 1.18.0
   Control:
     name: Misc
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: a535870cfc9f44e2a6619b2ba4c5015d, type: 3}
     type: 103
     parameter:
       name: 

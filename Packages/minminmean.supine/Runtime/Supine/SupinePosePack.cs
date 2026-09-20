@@ -107,6 +107,12 @@ namespace Supine
         /// </summary>
         public bool poseAdjust;
 
+        /// <summary>
+        /// このパックのサブメニューと Pose Adjust に使うアイコン。無くてもよい。
+        /// ポーズごとのアイコンは SupinePoseEntry.icon が持つ。
+        /// </summary>
+        public Texture2D menuIcon;
+
         public SupinePoseEntry[] poses = new SupinePoseEntry[0];
 
         public string ResolvePackId()

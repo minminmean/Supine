@@ -58,6 +58,7 @@ namespace Supine.PosePack
             List<string> folderOrder = new List<string>();
             Dictionary<string, List<ResolvedPose>> folders = new Dictionary<string, List<ResolvedPose>>();
             HashSet<string> adjustFolders = new HashSet<string>();
+            Dictionary<string, Texture2D> folderIcons = new Dictionary<string, Texture2D>();
 
             foreach (ResolvedPose pose in poses)
             {
@@ -72,6 +73,12 @@ namespace Supine.PosePack
 
                 // 同じメニューへ合流したパックのうち、1つでも宣言していれば出す
                 if (pose.Pack.poseAdjust) adjustFolders.Add(folder);
+
+                // アイコンは先に名乗ったパックのものを使う
+                if (pose.Pack.menuIcon != null && !folderIcons.ContainsKey(folder))
+                {
+                    folderIcons.Add(folder, pose.Pack.menuIcon);
+                }
             }
 
             // 雛形は自分で作った複製を拾わないよう、1つも生やす前に確保しておく
@@ -85,8 +92,11 @@ namespace Supine.PosePack
 
             foreach (string folder in folderOrder)
             {
-                Transform submenu = FindChild(posesRoot, folder) ?? CreateSubMenu(posesRoot, folder);
-                FillPages(submenu, folders[folder], adjustFolders.Contains(folder), footAnchor, warnings);
+                folderIcons.TryGetValue(folder, out Texture2D icon);
+
+                Transform submenu = FindChild(posesRoot, folder) ?? CreateSubMenu(posesRoot, folder, icon);
+                FillPages(
+                    submenu, folders[folder], adjustFolders.Contains(folder), icon, footAnchor, warnings);
             }
 
             // パックを足したぶん Misc が押し出されるので、末尾へ送り直す
@@ -116,7 +126,7 @@ namespace Supine.PosePack
         /// </summary>
         private static void FillPages(
             Transform page, List<ResolvedPose> poses,
-            bool withAdjust, GameObject footAnchor, List<string> warnings)
+            bool withAdjust, Texture2D icon, GameObject footAnchor, List<string> warnings)
         {
             // 末尾に必ず付く項目の数
             int trailing = (withAdjust ? 1 : 0) + (footAnchor != null ? 1 : 0);
@@ -147,12 +157,12 @@ namespace Supine.PosePack
                 }
                 index += count;
 
-                if (withAdjust) CreatePoseAdjust(page);
+                if (withAdjust) CreatePoseAdjust(page, icon);
                 if (footAnchor != null) CopyItem(footAnchor, page);
 
                 if (index >= poses.Count) return;
 
-                page = CreateSubMenu(page, NextPageName);
+                page = CreateSubMenu(page, NextPageName, icon);
             }
         }
 
@@ -164,7 +174,7 @@ namespace Supine.PosePack
         /// 姿勢の微調整を回すラジアル。
         /// ポーズのクリップに2つ以上キーがあると、その間をこの軸でスクラブできる。
         /// </summary>
-        private static void CreatePoseAdjust(Transform parent)
+        private static void CreatePoseAdjust(Transform parent, Texture2D icon)
         {
             GameObject go = new GameObject(PoseAdjustName);
             Undo.RegisterCreatedObjectUndo(go, "Create Supine Pose Menu");
@@ -174,6 +184,7 @@ namespace Supine.PosePack
             item.Control = new VRCExpressionsMenu.Control
             {
                 name = PoseAdjustName,
+                icon = icon,
                 type = VRCExpressionsMenu.Control.ControlType.RadialPuppet,
 
                 // 開いている間だけ立つフラグが本体で、回す軸は subParameters 側
@@ -204,7 +215,7 @@ namespace Supine.PosePack
             copy.name = template.name;
         }
 
-        private static Transform CreateSubMenu(Transform parent, string name)
+        private static Transform CreateSubMenu(Transform parent, string name, Texture2D icon)
         {
             GameObject go = new GameObject(name);
             Undo.RegisterCreatedObjectUndo(go, "Create Supine Pose Menu");
@@ -214,6 +225,7 @@ namespace Supine.PosePack
             item.Control = new VRCExpressionsMenu.Control
             {
                 name = name,
+                icon = icon,
                 type = VRCExpressionsMenu.Control.ControlType.SubMenu,
                 parameter = new VRCExpressionsMenu.Control.Parameter { name = string.Empty },
                 subParameters = new VRCExpressionsMenu.Control.Parameter[0],
