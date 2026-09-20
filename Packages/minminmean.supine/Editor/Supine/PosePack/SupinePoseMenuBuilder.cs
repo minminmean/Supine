@@ -12,13 +12,21 @@ namespace Supine.PosePack
     ///
     /// Prefab側に項目を並べておく方式だと、パックの数だけPrefabを用意することになる。
     /// 項目はコントローラの配線と同じタイミングで作り、Prefabは受け皿だけを持つ。
+    ///
+    /// 置き場所はメニューのトップレベルで、**パックごとに1枚**サブメニューを作る。
+    /// 共通の1枚へ全部まとめると、VRChatの上限8項目をすぐ超えて「Next」で
+    /// ページを送ることになり、目的のポーズに辿り着くまでの手数が増える。
+    ///
+    /// ポーズ以外の項目は Misc にまとめてあるので、トップレベルにはポーズの
+    /// メニューだけが並ぶ。Misc は常に末尾へ送り直す。
     /// </summary>
     internal static class SupinePoseMenuBuilder
     {
-        /// <summary>パックが置き場所を指定しなかったときの既定のサブメニュー名</summary>
-        public const string DefaultMenuFolderName = "Pose Packs";
+        /// <summary>パックのサブメニューを並べる先</summary>
+        private const string RootMenuName = "Suimin";
 
-        private const string PosesMenuName = "Supine Poses";
+        /// <summary>ポーズ以外をまとめた項目。常に末尾に置く</summary>
+        private const string MiscMenuName = "Misc";
 
         /// <summary>VRChatの1メニューあたりの項目数上限</summary>
         private const int MenuCapacity = 8;
@@ -26,16 +34,19 @@ namespace Supine.PosePack
         /// <summary>ページが溢れたときに次ページへ送る項目の名前</summary>
         private const string NextPageName = "Next";
 
+        /// <summary>各パックのメニュー末尾に添える項目。既存のものを複製して使う</summary>
+        private const string FootAnchorName = "Foot Anchor";
+
         public static void Build(
             GameObject maPrefabInstance, IReadOnlyList<ResolvedPose> poses, List<string> warnings)
         {
             if (poses == null || poses.Count == 0) return;
 
-            Transform posesRoot = FindDescendant(maPrefabInstance.transform, PosesMenuName);
+            Transform posesRoot = FindDescendant(maPrefabInstance.transform, RootMenuName);
             if (posesRoot == null)
             {
                 warnings.Add(
-                    "Could not find the '" + PosesMenuName + "' menu in the Supine MA prefab. " +
+                    "Could not find the '" + RootMenuName + "' menu in the Supine MA prefab. " +
                     "Pose pack menu items were not created.");
                 return;
             }
@@ -56,43 +67,66 @@ namespace Supine.PosePack
                 group.Add(pose);
             }
 
+            // 雛形は自分で作った複製を拾わないよう、1つも生やす前に確保しておく
+            GameObject footAnchor = FindDescendantObject(maPrefabInstance.transform, FootAnchorName);
+            if (footAnchor == null)
+            {
+                warnings.Add(
+                    "Could not find the '" + FootAnchorName + "' menu item to copy. " +
+                    "Pose pack menus were created without it.");
+            }
+
             foreach (string folder in folderOrder)
             {
                 Transform submenu = FindChild(posesRoot, folder) ?? CreateSubMenu(posesRoot, folder);
-                FillPages(submenu, folders[folder], warnings);
+                FillPages(submenu, folders[folder], footAnchor, warnings);
             }
+
+            // パックを足したぶん Misc が押し出されるので、末尾へ送り直す
+            Transform misc = FindChild(posesRoot, MiscMenuName);
+            if (misc != null) misc.SetAsLastSibling();
 
             WarnIfOverCapacity(posesRoot, warnings);
         }
 
+        /// <summary>
+        /// このポーズを入れるサブメニューの名前。
+        /// 指定が無ければパック名をそのまま使う。同じ名前を名乗ったパック同士は合流する。
+        /// </summary>
         private static string ResolveFolderName(ResolvedPose pose)
         {
             string folder = pose.Pack.menuFolderName;
-            return string.IsNullOrEmpty(folder) ? DefaultMenuFolderName : folder;
+            return string.IsNullOrEmpty(folder) ? pose.Pack.ResolvePackId() : folder;
         }
 
         /// <summary>
         /// サブメニューへ項目を並べる。上限を超える分は「Next」で次ページへ送る。
         /// 黙って切り捨てると、買ったポーズがメニューに出てこないという形で現れる。
+        ///
+        /// Foot Anchor はどのページの末尾にも置く。ページを送った先で使えないと、
+        /// 足を固定するためだけに前のページへ戻ることになる。
+        /// 並びは「ポーズ … / Foot Anchor / Next」。
         /// </summary>
-        private static void FillPages(Transform page, List<ResolvedPose> poses, List<string> warnings)
+        private static void FillPages(
+            Transform page, List<ResolvedPose> poses, GameObject footAnchor, List<string> warnings)
         {
             int index = 0;
 
-            while (index < poses.Count)
+            while (true)
             {
-                int used = page.childCount;
+                // 末尾の Foot Anchor のぶんを先に引く
+                int capacity = MenuCapacity - page.childCount - 1;
                 int remaining = poses.Count - index;
 
-                // 次ページが要るなら、送り項目のぶんを1つ空けておく
-                bool needsNextPage = remaining > MenuCapacity - used;
-                int capacity = MenuCapacity - used - (needsNextPage ? 1 : 0);
+                // 収まらないなら、送りのぶんもさらに1枠要る
+                bool needsNextPage = remaining > capacity;
+                if (needsNextPage) capacity--;
 
                 if (capacity <= 0)
                 {
                     warnings.Add(
                         "The pose menu '" + page.name + "' is already full. " +
-                        (poses.Count - index) + " pose(s) could not be added.");
+                        remaining + " pose(s) could not be added.");
                     return;
                 }
 
@@ -103,10 +137,23 @@ namespace Supine.PosePack
                 }
                 index += count;
 
+                if (footAnchor != null) CopyItem(footAnchor, page);
+
                 if (index >= poses.Count) return;
 
                 page = CreateSubMenu(page, NextPageName);
             }
+        }
+
+        /// <summary>
+        /// 既存のメニュー項目をそのまま複製して足す。
+        /// 作り直すとアイコンや同期の設定を書き写すことになり、元を直したときにずれる。
+        /// </summary>
+        private static void CopyItem(GameObject template, Transform parent)
+        {
+            GameObject copy = Object.Instantiate(template, parent);
+            Undo.RegisterCreatedObjectUndo(copy, "Create Supine Pose Menu");
+            copy.name = template.name;
         }
 
         private static Transform CreateSubMenu(Transform parent, string name)
@@ -177,6 +224,12 @@ namespace Supine.PosePack
                 if (child.name == name) return child;
             }
             return null;
+        }
+
+        private static GameObject FindDescendantObject(Transform root, string name)
+        {
+            Transform found = FindDescendant(root, name);
+            return found == null ? null : found.gameObject;
         }
 
         private static Transform FindDescendant(Transform root, string name)

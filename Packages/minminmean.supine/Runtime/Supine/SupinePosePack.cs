@@ -93,7 +93,7 @@ namespace Supine
         public string minimumSupineVersion = string.Empty;
 
         /// <summary>
-        /// メニューのどのサブメニューへ入れるか。空なら既定の置き場所。
+        /// メニューのどのサブメニューへ入れるか。空ならパック名をそのまま使う。
         /// 既存のサブメニュー名を名乗れば、そこへ合流できる。
         /// </summary>
         public string menuFolderName = string.Empty;
