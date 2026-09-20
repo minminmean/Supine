@@ -25,7 +25,7 @@ namespace Supine
         private readonly VRCAvatarDescriptor _avatarDescriptor;
         private readonly SupineVariant _variant;
         private readonly string _versionFolderName;
-        private string _avatarNameWithSuffix;
+        private readonly string _avatarName;
 
         public bool CanCombine { get; private set; } = true;
 
@@ -38,7 +38,7 @@ namespace Supine
         public SupineCombiner(GameObject avatar, SupineVariant variant, string versionFolderName)
         {
             _avatar = avatar;
-            _avatarNameWithSuffix = AssetPathUtility.SanitizeFileName(avatar.name);
+            _avatarName = AssetPathUtility.SanitizeFileName(avatar.name);
             _avatarDescriptor = avatar.GetComponent<VRCAvatarDescriptor>();
             _variant = variant;
             _versionFolderName = versionFolderName;
@@ -54,13 +54,6 @@ namespace Supine
                 // guids.jsonが読めていない、または内容が欠けている
                 Debug.LogError("[VRCSupine] Could not resolve the Supine variant assets. Check guids.json.");
                 CanCombine = false;
-            }
-            else if (HasGeneratedFiles())
-            {
-                //  すでに組込済みの場合、(アバター名)_(数字)で作れるようになるまでループ回す
-                int suffix = 1;
-                while (HasGeneratedFiles(suffix)) suffix++;
-                _avatarNameWithSuffix += "_" + suffix.ToString();
             }
         }
 
@@ -509,35 +502,22 @@ namespace Supine
         private T CopyAssetFrom<T>(string templatePath) where T : Object
         {
             string templateName = AssetPathUtility.SanitizeFileName(Path.GetFileName(templatePath));
-            string destinationPath = MakeGeneratedDirPath() + "/" + _avatarNameWithSuffix + "_" + templateName;
+
+            // 組み込むたびにフォルダごと増えると探しにくいので、
+            // フォルダはアバターごとに1つに固定して、同名になるときだけファイル名に連番を足す
+            string destinationPath = AssetPathUtility.MakeUniqueAssetPath(
+                MakeGeneratedDirPath() + "/" + _avatarName + "_" + templateName);
 
             return AssetPathUtility.CopyAssetFromPath<T>(templatePath, destinationPath);
         }
 
         /// <summary>
-        /// 生成したごろ寝システムコントローラを置くディレクトリパスを作成
+        /// 生成したごろ寝システムコントローラを置くディレクトリパスを作成。
+        /// アバターごとに1つで、組み込み直しても増えない。
         /// </summary>
-        /// <param name="suffix">int 後ろにつける数字</param>
-        private string MakeGeneratedDirPath(int suffix = 0)
+        private string MakeGeneratedDirPath()
         {
-            string generatedDirPath = MmmAssetPath + '/' + _versionFolderName + "/Generated";
-            if (suffix > 0) {
-                return generatedDirPath + "/" + _avatarNameWithSuffix + "_" + suffix.ToString();
-            }
-            else
-            {
-                return generatedDirPath + "/" + _avatarNameWithSuffix;
-            }
-        }
-
-        /// <summary>
-        /// すでに作成されたファイルがあるか判定
-        /// </summary>
-        /// <param name="suffix">int 後ろにつける数字</param>
-        /// <returns>bool</returns>
-        private bool HasGeneratedFiles(int suffix = 0)
-        {
-            return AssetDatabase.IsValidFolder(MakeGeneratedDirPath(suffix));
+            return MmmAssetPath + '/' + _versionFolderName + "/Generated/" + _avatarName;
         }
     }
 }
