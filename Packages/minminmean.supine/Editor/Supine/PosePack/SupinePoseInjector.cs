@@ -44,6 +44,12 @@ namespace Supine.PosePack
 
         private const float TransitionDuration = 0.25f;
 
+        /// <summary>生成したステートを置く列を、既存のノードからどれだけ右へ離すか</summary>
+        private const float ColumnGap = 300f;
+
+        /// <summary>生成したステートの縦の間隔。テンプレートのポーズ列の間隔に合わせている</summary>
+        private const float RowGap = 110f;
+
         private readonly AnimatorController _controller;
         private readonly IReadOnlyDictionary<string, string> _renamedStates;
         private readonly List<string> _warnings;
@@ -93,7 +99,7 @@ namespace Supine.PosePack
             if (observerObserving == null) return injected;
 
             HashSet<string> existingNames = CollectStateNames();
-            Vector3 origin = GetStatePosition(crouching) + new Vector3(360f, 0f, 0f);
+            Vector3 origin = FindFreeColumn(crouching.Machine);
 
             for (int i = 0; i < poses.Count; i++)
             {
@@ -101,7 +107,7 @@ namespace Supine.PosePack
                 pose.StateName = MakeUniqueStateName(pose.Entry.id, existingNames);
 
                 AnimatorState state = crouching.Machine.AddState(
-                    pose.StateName, origin + new Vector3(0f, 60f * i, 0f));
+                    pose.StateName, origin + new Vector3(0f, RowGap * i, 0f));
 
                 ConfigurePoseState(state, pose);
                 ConnectPoseState(state, pose, crouching, poseChange);
@@ -270,13 +276,49 @@ namespace Supine.PosePack
             return name;
         }
 
-        private static Vector3 GetStatePosition(StateLocation location)
+        /// <summary>
+        /// 既存のノードの右隣に、空いた列の先頭を返す。
+        ///
+        /// しゃがみからの相対位置で置くと、テンプレートのレイアウト次第で既存のポーズ列に
+        /// ぴったり重なる。実際そうなった。ノード全体の右端を見て、その外側に置く。
+        /// </summary>
+        private static Vector3 FindFreeColumn(AnimatorStateMachine machine)
         {
-            foreach (ChildAnimatorState child in location.Machine.states)
+            float maxX = 0f;
+            float minY = 0f;
+            bool any = false;
+
+            foreach (ChildAnimatorState child in machine.states)
             {
-                if (child.state == location.State) return child.position;
+                Extend(child.position, ref maxX, ref minY, ref any);
             }
-            return Vector3.zero;
+            foreach (ChildAnimatorStateMachine child in machine.stateMachines)
+            {
+                Extend(child.position, ref maxX, ref minY, ref any);
+            }
+
+            // Entry / Exit / AnyState も画面上の場所を取るので、右端の計算に入れる
+            Extend(machine.entryPosition, ref maxX, ref minY, ref any);
+            Extend(machine.exitPosition, ref maxX, ref minY, ref any);
+            Extend(machine.anyStatePosition, ref maxX, ref minY, ref any);
+
+            if (!any) return Vector3.zero;
+
+            return new Vector3(maxX + ColumnGap, minY, 0f);
+        }
+
+        private static void Extend(Vector3 position, ref float maxX, ref float minY, ref bool any)
+        {
+            if (!any)
+            {
+                maxX = position.x;
+                minY = position.y;
+                any = true;
+                return;
+            }
+
+            if (position.x > maxX) maxX = position.x;
+            if (position.y < minY) minY = position.y;
         }
 
         /// <summary>

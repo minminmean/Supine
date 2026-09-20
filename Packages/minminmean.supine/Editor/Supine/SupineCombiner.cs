@@ -116,7 +116,7 @@ namespace Supine
             // パックが1つも無ければ何も起きないため、従来どおりの生成物になる
             List<string> posePackWarnings = new List<string>();
             List<PosePack.ResolvedPose> injectedPoses = InjectPosePacks(
-                supineLocomotion, renamedStates, posePackWarnings);
+                supineLocomotion, options, renamedStates, posePackWarnings);
 
             EditorUtility.SetDirty(supineLocomotion);
             AssetDatabase.SaveAssets();
@@ -341,6 +341,7 @@ namespace Supine
         /// <returns>差し込めたポーズの一覧。メニュー生成が同じ並びを使う</returns>
         private List<PosePack.ResolvedPose> InjectPosePacks(
             AnimatorController supineLocomotion,
+            SupineCombineOptions options,
             IReadOnlyDictionary<string, string> renamedStates,
             List<string> warnings)
         {
@@ -349,8 +350,44 @@ namespace Supine
 
             if (resolved.Count == 0) return resolved;
 
-            return new PosePack.SupinePoseInjector(supineLocomotion, renamedStates, warnings)
+            return new PosePack.SupinePoseInjector(
+                    supineLocomotion, BuildPoseStateNameMap(options, renamedStates), warnings)
                 .Inject(resolved);
+        }
+
+        /// <summary>
+        /// テンプレート側のステート名から、生成物での実名を引く表を作る。
+        ///
+        /// 追加モードでは食い違いが2種類ある。
+        /// ・流用したステート（しゃがみ、伏せ）は追加先の名前になる。こちらはRenamedStatesに載らない
+        /// ・複製したステートは名前が衝突するとUnityが連番を付ける。こちらはRenamedStatesに載る
+        /// 前者を拾い損ねると、入口のステート名を変えているアバターでポーズが黙って増えなくなる。
+        /// </summary>
+        private static IReadOnlyDictionary<string, string> BuildPoseStateNameMap(
+            SupineCombineOptions options, IReadOnlyDictionary<string, string> renamedStates)
+        {
+            Dictionary<string, string> map = new Dictionary<string, string>();
+
+            if (options.mode == SupineCombineMode.Add)
+            {
+                foreach (KeyValuePair<string, string> pair in
+                         SupineLocomotionAdder.BuildStateNameOverrides(options))
+                {
+                    // 空文字は「対応するステートを持たせない」の意味なので、名前としては使えない
+                    if (string.IsNullOrEmpty(pair.Value)) continue;
+                    map[pair.Key] = pair.Value;
+                }
+            }
+
+            if (renamedStates != null)
+            {
+                foreach (KeyValuePair<string, string> pair in renamedStates)
+                {
+                    map[pair.Key] = pair.Value;
+                }
+            }
+
+            return map;
         }
 
         /// <summary>
