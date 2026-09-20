@@ -16,6 +16,7 @@ namespace Supine.Utilities
     {
         public SupineVariant variant;
         public Animations animations;
+        public Crouch crouch;
         public VRChat vrchat;
 
         /// <summary>
@@ -26,6 +27,17 @@ namespace Supine.Utilities
         public struct VRChat
         {
             public string default_locomotion;
+        }
+
+        /// <summary>
+        /// しゃがみポーズ切り替えのブレンドツリー。
+        /// バリアントを足すときはこのツリーに子を足すだけでよく、
+        /// メニューの項目はツリーの子から生成されるため二重管理にならない。
+        /// </summary>
+        [Serializable]
+        public struct Crouch
+        {
+            public string pose_tree;
         }
 
         [Serializable]

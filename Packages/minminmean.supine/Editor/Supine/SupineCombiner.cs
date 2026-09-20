@@ -146,6 +146,17 @@ namespace Supine
             // 差し込んだポーズのメニュー項目を生やす。
             // コントローラ側の採番とここが同じ並びを使うので、値の対応がずれない
             PosePack.SupinePoseMenuBuilder.Build(maPrefabInstance, injectedPoses, posePackWarnings);
+
+            // しゃがみポーズの切り替えを組み込む。
+            // ポーズとは別の軸なので、パックが1つも無くても効く
+            PosePack.SupineCrouchInjector.Inject(
+                supineLocomotion, maPrefabInstance,
+                BuildPoseStateNameMap(options, renamedStates), options, posePackWarnings);
+
+            // 根ツリーをコントローラの子アセットとして抱かせたので、書き出し直す
+            EditorUtility.SetDirty(supineLocomotion);
+            AssetDatabase.SaveAssets();
+
             foreach (string warning in posePackWarnings)
             {
                 Debug.LogWarning("[VRCSupine] " + warning);

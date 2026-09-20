@@ -30,6 +30,16 @@ namespace Supine.Utilities
         public string add_state_help;
         public string add_state_conflict;
         public string add_state_already_combined;
+        public string crouch_pose;
+        public string crouch_default;
+        public string crouch_kneel_f;
+        public string crouch_air_chair_f;
+        public string crouch_air_chair_cross_f;
+        public string crouch_kneel_m;
+        public string crouch_air_chair_m;
+        public string crouch_air_chair_cross_m;
+        public string crouch_conflict;
+        public string crouch_keep_existing;
         public string disable_jump_motion;
         public string enable_jump_at_desktop;
         public string sit1;

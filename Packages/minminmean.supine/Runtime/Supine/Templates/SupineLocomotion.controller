@@ -576,7 +576,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 20600000, guid: 1fe93258fe621c344be8713451c5104f, type: 2}
+  m_Motion: {fileID: 20600000, guid: bb05559edaa781146b9cc26e16dd952f, type: 2}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -4818,6 +4818,12 @@ AnimatorController:
     m_Controller: {fileID: 9100000}
   - m_Name: VRCSupineExAdjusting
     m_Type: 4
+    m_DefaultFloat: 0
+    m_DefaultInt: 0
+    m_DefaultBool: 0
+    m_Controller: {fileID: 9100000}
+  - m_Name: CrouchPose
+    m_Type: 1
     m_DefaultFloat: 0
     m_DefaultInt: 0
     m_DefaultBool: 0

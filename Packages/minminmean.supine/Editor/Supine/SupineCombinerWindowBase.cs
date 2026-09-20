@@ -47,6 +47,11 @@ namespace Supine
         private string _cachedLieDownEntryStateName;
         private List<string> _lieDownDestinationNames = new List<string>();
 
+        // 既存のしゃがみが入れ子のブレンドツリーかどうか。
+        // 毎フレーム走査すると重いので、判定に効く入力が変わったときだけ引き直す
+        private BlendTree _existingCrouchTree;
+        private string _existingCrouchSignature;
+
         // 継承元アニメーターのステート一覧
         private AnimatorController _cachedInheritSource;
         private string[] _inheritSourceStateNames = new string[0];
@@ -179,7 +184,78 @@ namespace Supine
                 DrawAddOptions(localizeDict);
             }
 
+            DrawCrouchPoseConflict(localizeDict);
+
             EditorGUI.indentLevel--;
+        }
+
+        /// <summary>
+        /// 既存のしゃがみポーズ切り替えとぶつかるときだけ、どちらを活かすか選ばせる。
+        ///
+        /// 他のツールも同じ手法（しゃがみステートに入れ子のブレンドツリーを差す）を
+        /// 使っていることがある。黙って上書きすると相手の切り替えを乗っ取るので、
+        /// 入れ子を見つけたときだけ選択肢を出す。
+        /// ぶつかっていないときに出しても意味が分からないだけなので、普段は隠す。
+        /// </summary>
+        private void DrawCrouchPoseConflict(LocalizeDictionary localizeDict)
+        {
+            RefreshExistingCrouchTree();
+            if (_existingCrouchTree == null) return;
+
+            EditorGUILayout.HelpBox(localizeDict.crouch_conflict, MessageType.Warning);
+
+            EditorGUI.BeginChangeCheck();
+            _options.keepExistingCrouchPose = EditorGUILayout.ToggleLeft(
+                localizeDict.crouch_keep_existing, _options.keepExistingCrouchPose);
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                _canCombine = false;
+            }
+        }
+
+        /// <summary>
+        /// 既定にするしゃがみポーズ。CrouchPose パラメータの初期値になる。
+        /// 既存を優先する選択をしているときは、そもそも組み込まないので伏せる。
+        /// </summary>
+        private void DrawCrouchPose(LocalizeDictionary localizeDict)
+        {
+            if (_options.keepExistingCrouchPose) return;
+
+            string[] poses = CrouchPoseTable.GetLabels(localizeDict);
+            _options.defaultCrouchPose = CrouchPoseTable.FromIndex(
+                EditorGUILayout.Popup(
+                    localizeDict.crouch_pose,
+                    CrouchPoseTable.IndexOf(_options.defaultCrouchPose), poses));
+        }
+
+        /// <summary>
+        /// 既存のしゃがみモーションの判定を引き直す。
+        /// コントローラ全体を走査するため、入力が変わっていなければ前回の結果を使う。
+        /// </summary>
+        private void RefreshExistingCrouchTree()
+        {
+            VRCAvatarDescriptor avatarDescriptor =
+                _avatar != null ? _avatar.GetComponent<VRCAvatarDescriptor>() : null;
+
+            string signature = string.Join("|", new[]
+                {
+                    _refreshGeneration.ToString(),
+                    avatarDescriptor != null ? avatarDescriptor.GetInstanceID().ToString() : "0",
+                    _options.mode.ToString(),
+                    _options.addTargetOverride != null
+                        ? _options.addTargetOverride.GetInstanceID().ToString()
+                        : "0",
+                    _options.mode == SupineCombineMode.Add
+                        ? _options.entryStateName
+                        : (_options.ShouldInherit ? _options.inheritCrouchingStateName : "-")
+                });
+
+            if (signature == _existingCrouchSignature) return;
+
+            _existingCrouchSignature = signature;
+            _existingCrouchTree =
+                PosePack.SupineCrouchInjector.FindExistingNestedTree(avatarDescriptor, _options);
         }
 
         /// <summary>
@@ -527,6 +603,8 @@ namespace Supine
                 EditorGUILayout.Popup(localizeDict.sit1, SittingPoseTable.IndexOf(_options.sittingPose1), sittingPoses));
             _options.sittingPose2 = SittingPoseTable.FromIndex(
                 EditorGUILayout.Popup(localizeDict.sit2, SittingPoseTable.IndexOf(_options.sittingPose2), sittingPoses));
+
+            DrawCrouchPose(localizeDict);
         }
 
         private void DrawButtons(LocalizeDictionary localizeDict)
@@ -611,8 +689,12 @@ namespace Supine
             _options.mode = (SupineCombineMode)EditorPrefs.GetInt(PrefsKey("combineMode"), (int)_options.mode);
             _options.shouldInheritOriginalAnimation =
                 EditorPrefs.GetBool(PrefsKey("inheritOriginal"), _options.shouldInheritOriginalAnimation);
+            _options.keepExistingCrouchPose =
+                EditorPrefs.GetBool(PrefsKey("keepExistingCrouchPose"), _options.keepExistingCrouchPose);
             _options.disableJumpMotion   = EditorPrefs.GetBool(PrefsKey("disableJumpMotion"), _options.disableJumpMotion);
             _options.enableJumpAtDesktop = EditorPrefs.GetBool(PrefsKey("enableJumpAtDesktop"), _options.enableJumpAtDesktop);
+            _options.defaultCrouchPose =
+                (CrouchPose)EditorPrefs.GetInt(PrefsKey("defaultCrouchPose"), (int)_options.defaultCrouchPose);
             _options.sittingPose1 = (SittingPose)EditorPrefs.GetInt(PrefsKey("sittingPose1"), (int)_options.sittingPose1);
             _options.sittingPose2 = (SittingPose)EditorPrefs.GetInt(PrefsKey("sittingPose2"), (int)_options.sittingPose2);
         }
@@ -625,8 +707,10 @@ namespace Supine
             EditorPrefs.SetInt(PrefsKey("language"), (int)_language);
             EditorPrefs.SetInt(PrefsKey("combineMode"), (int)_options.mode);
             EditorPrefs.SetBool(PrefsKey("inheritOriginal"), _options.shouldInheritOriginalAnimation);
+            EditorPrefs.SetBool(PrefsKey("keepExistingCrouchPose"), _options.keepExistingCrouchPose);
             EditorPrefs.SetBool(PrefsKey("disableJumpMotion"), _options.disableJumpMotion);
             EditorPrefs.SetBool(PrefsKey("enableJumpAtDesktop"), _options.enableJumpAtDesktop);
+            EditorPrefs.SetInt(PrefsKey("defaultCrouchPose"), (int)_options.defaultCrouchPose);
             EditorPrefs.SetInt(PrefsKey("sittingPose1"), (int)_options.sittingPose1);
             EditorPrefs.SetInt(PrefsKey("sittingPose2"), (int)_options.sittingPose2);
         }
