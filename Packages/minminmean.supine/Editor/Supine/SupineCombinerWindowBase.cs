@@ -359,6 +359,11 @@ namespace Supine
             _cachedInheritSource = source;
             _inheritSourceStateNames = BuildStateNames(source);
 
+            // 名前一致だけだと、ステート名を変えているアバターで軒並み「なし」になる。
+            // 追加モードと同じく、遷移の構造からも推測する
+            Dictionary<string, string> inferred =
+                SupineLocomotionAdder.InferInheritSourceStateNames(source);
+
             foreach (string templateStateName in InheritedStateTable.TemplateStateNames)
             {
                 string current = InheritedStateTable.GetSourceStateName(_options, templateStateName);
@@ -367,10 +372,12 @@ namespace Supine
                 if (!sourceChanged && current != null &&
                     (current.Length == 0 || DisplayIndexOf(_inheritSourceStateNames, current) > 0)) continue;
 
-                // 名前が一致すればそれを初期選択に、しなければ「なし」（＝ごろ寝システムのアニメーション）
+                // 推測できたものを初期選択に、できなければ「なし」（＝ごろ寝システムのアニメーション）
                 InheritedStateTable.SetSourceStateName(
                     ref _options, templateStateName,
-                    AutoSelectStateName(_inheritSourceStateNames, templateStateName));
+                    AutoSelectStateName(
+                        _inheritSourceStateNames,
+                        inferred.TryGetValue(templateStateName, out string guess) ? guess : templateStateName));
             }
         }
 
