@@ -112,6 +112,12 @@ namespace Supine
             }
             SetSittingAnimations(supineLocomotion, options.sittingPose1, options.sittingPose2, renamedStates);
 
+            // プロジェクトに置かれたポーズパックを差し込む。
+            // パックが1つも無ければ何も起きないため、従来どおりの生成物になる
+            List<string> posePackWarnings = new List<string>();
+            List<PosePack.ResolvedPose> injectedPoses = InjectPosePacks(
+                supineLocomotion, renamedStates, posePackWarnings);
+
             EditorUtility.SetDirty(supineLocomotion);
             AssetDatabase.SaveAssets();
 
@@ -136,6 +142,14 @@ namespace Supine
             component.mergeAnimatorMode = MergeAnimatorMode.Replace;
 
             EditorUtility.SetDirty(component);
+
+            // 差し込んだポーズのメニュー項目を生やす。
+            // コントローラ側の採番とここが同じ並びを使うので、値の対応がずれない
+            PosePack.SupinePoseMenuBuilder.Build(maPrefabInstance, injectedPoses, posePackWarnings);
+            foreach (string warning in posePackWarnings)
+            {
+                Debug.LogWarning("[VRCSupine] " + warning);
+            }
 
             // 設置済みのMA Prefabを整理
             SortAndCleanMAPrefabs(maPrefabInstance, oldPrefabs);
@@ -316,6 +330,27 @@ namespace Supine
                     (foundEnableJumpAtDesktop ? "" : " (EnableJumpAtDesktop)") +
                     ". The jump and fall options had no effect.");
             }
+        }
+
+        /// <summary>
+        /// プロジェクト内のポーズパックを集め、コントローラへ差し込む。
+        ///
+        /// パッケージからアセットは参照できないため、こちらがパックを知ることはできない。
+        /// AssetDatabaseから拾う形にして、依存の向きを一方向に保つ。
+        /// </summary>
+        /// <returns>差し込めたポーズの一覧。メニュー生成が同じ並びを使う</returns>
+        private List<PosePack.ResolvedPose> InjectPosePacks(
+            AnimatorController supineLocomotion,
+            IReadOnlyDictionary<string, string> renamedStates,
+            List<string> warnings)
+        {
+            List<PosePack.ResolvedPose> resolved =
+                PosePack.SupinePosePackRegistry.Resolve(supineLocomotion, warnings);
+
+            if (resolved.Count == 0) return resolved;
+
+            return new PosePack.SupinePoseInjector(supineLocomotion, renamedStates, warnings)
+                .Inject(resolved);
         }
 
         /// <summary>
