@@ -38,6 +38,7 @@ namespace Supine.PosePack
         private const string SetCurrentPoseStateName = "Set Current Pose";
         private const string ObservingStateName = "Observing";
         private const string PoseAdjustingStateName = "Pose Adjusting";
+        private const string RestoreHeadTrackingStateName = "Restore Head Tracking";
 
         /// <summary>
         /// 出口の閾値を入口より少しだけ高くするための差。
@@ -102,6 +103,12 @@ namespace Supine.PosePack
             StateLocation observerObserving = FindState(ObservingStateName, setCurrentPose.LayerIndex);
             if (observerObserving == null) return injected;
 
+            // ラジアルを閉じたあとの戻り先。Pose Adjusting 自身が頭を切っているので、
+            // トラッキング指定のポーズはここを通さないと切れたままになる
+            StateLocation poseAdjusting = FindState(PoseAdjustingStateName, prepareSupine.LayerIndex);
+            StateLocation restoreTracking = FindState(RestoreHeadTrackingStateName, prepareSupine.LayerIndex);
+            bool canWireAdjustExit = poseAdjusting != null && restoreTracking != null;
+
             HashSet<string> existingNames = CollectStateNames();
             Vector3 origin = FindFreeColumn(crouching.Machine);
 
@@ -120,11 +127,29 @@ namespace Supine.PosePack
                 AddDispatchEntry(desktopObserving.State, pose, prepareAnimation, prepareTracking, true);
                 AddCurrentPoseWatch(observerObserving.State, setCurrentPose.State, pose);
 
+                if (canWireAdjustExit)
+                {
+                    AddAdjustExit(poseAdjusting.State, restoreTracking.State, pose);
+                }
+                else if (pose.Entry.headTracking == SupinePoseHeadTracking.Tracking)
+                {
+                    _warnings.Add(
+                        "Could not find '" + PoseAdjustingStateName + "' and '" + RestoreHeadTrackingStateName +
+                        "'. Head tracking will stay off after Pose Adjust for pose '" + pose.Entry.id + "'.");
+                }
+
                 injected.Add(pose);
             }
 
             // Pose Adjusting は「どのポーズでもない」受け皿なので、必ず最後に評価させる
             KeepTransitionLast(desktopObserving.State, PoseAdjustingStateName);
+
+            // 同じ理由で、ラジアルを閉じたときの素通り行も最後へ回す。
+            // これを先に評価されると、上で足した復帰行に届かない
+            if (canWireAdjustExit)
+            {
+                KeepTransitionLast(poseAdjusting.State, ObservingStateName);
+            }
 
             return injected;
         }
@@ -203,6 +228,23 @@ namespace Supine.PosePack
             {
                 transition.AddCondition(AnimatorConditionMode.If, 0f, PoseChangedParameter);
             }
+        }
+
+        /// <summary>
+        /// ポーズ調整のラジアルを閉じたときに、頭のトラッキングを戻す行を足す。
+        ///
+        /// Pose Adjusting は trackingHead=Animation で入るため、閉じたあと素通りさせると
+        /// 頭が切れたままになる。デスクトップでは首が不自然に折れる原因になる。
+        /// 逆にアニメーション指定のポーズは切れたままが正しいので、行を足さない。
+        /// </summary>
+        private void AddAdjustExit(AnimatorState poseAdjusting, AnimatorState restoreTracking, ResolvedPose pose)
+        {
+            if (pose.Entry.headTracking != SupinePoseHeadTracking.Tracking) return;
+
+            AnimatorStateTransition transition = poseAdjusting.AddTransition(restoreTracking);
+            Configure(transition, 0f);
+            transition.AddCondition(AnimatorConditionMode.IfNot, 0f, AdjustingParameter);
+            transition.AddCondition(AnimatorConditionMode.Equals, pose.Value, PoseParameter);
         }
 
         /// <summary>
