@@ -54,6 +54,16 @@ namespace Supine
         /// </summary>
         public CrouchPose defaultCrouchPose;
 
+        /// <summary>
+        /// 既定にするしゃがみポーズがパック側のものなら、その識別子（"packId/id"）。
+        /// 組み込みの7種から選んでいるときは空。
+        ///
+        /// defaultCrouchPose を拡張せずに別の欄を足しているのは、
+        /// パックは入れ替わるものだから。列挙体に混ぜると、
+        /// パックを外した瞬間に「存在しない値」が既定として残ってしまう。
+        /// </summary>
+        public string defaultCrouchPoseKey;
+
         public bool disableJumpMotion;
         public bool enableJumpAtDesktop;
 
@@ -73,6 +83,7 @@ namespace Supine
                     proneStateName                = null,
                     keepExistingCrouchPose        = false,
                     defaultCrouchPose             = CrouchPose.Default,
+                    defaultCrouchPoseKey          = string.Empty,
                     disableJumpMotion             = true,
                     enableJumpAtDesktop           = true,
                     sittingPose1                  = SittingPose.Petan,

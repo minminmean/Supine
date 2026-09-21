@@ -59,6 +59,12 @@ namespace Supine
         // アニメーターの中身が変わっていても参照が同じだと気付けないので、
         // ウィンドウに戻ってきたら読み直す。世代が食い違うキャッシュだけを作り直す
         private int _refreshGeneration = 1;
+
+        /// <summary>パックが足すしゃがみポーズ。選択肢を並べるためだけに持つ</summary>
+        private List<PosePack.ResolvedCrouchPose> _crouchPackPoses =
+            new List<PosePack.ResolvedCrouchPose>();
+
+        private int _crouchPackGeneration;
         private int _addTargetGeneration;
         private int _inheritSourceGeneration;
 
@@ -222,11 +228,70 @@ namespace Supine
         {
             if (_options.keepExistingCrouchPose) return;
 
-            string[] poses = CrouchPoseTable.GetLabels(localizeDict);
-            _options.defaultCrouchPose = CrouchPoseTable.FromIndex(
-                EditorGUILayout.Popup(
-                    localizeDict.crouch_pose,
-                    CrouchPoseTable.IndexOf(_options.defaultCrouchPose), poses));
+            RefreshCrouchPackPoses();
+
+            string[] builtIn = CrouchPoseTable.GetLabels(localizeDict);
+            string[] labels = new string[builtIn.Length + _crouchPackPoses.Count];
+            builtIn.CopyTo(labels, 0);
+
+            for (int i = 0; i < _crouchPackPoses.Count; i++)
+            {
+                labels[builtIn.Length + i] = _crouchPackPoses[i].Entry.ResolveDisplayName();
+            }
+
+            int selected = ResolveCrouchSelection(builtIn.Length);
+            int chosen = EditorGUILayout.Popup(localizeDict.crouch_pose, selected, labels);
+            if (chosen == selected) return;
+
+            if (chosen < builtIn.Length)
+            {
+                _options.defaultCrouchPose = CrouchPoseTable.FromIndex(chosen);
+                _options.defaultCrouchPoseKey = string.Empty;
+            }
+            else
+            {
+                PosePack.ResolvedCrouchPose pose = _crouchPackPoses[chosen - builtIn.Length];
+                _options.defaultCrouchPoseKey =
+                    PosePack.SupineCrouchInjector.MakeKey(pose.Pack, pose.Entry);
+            }
+        }
+
+        /// <summary>
+        /// 選択中の項目が選択肢の何番目かを引く。
+        ///
+        /// パックを外したあとは、覚えていた識別子がどれにも当たらなくなる。
+        /// その場合は組み込み側の選択へ黙って戻す。存在しないものを
+        /// 選んだままにすると、組み込んだときだけ違うポーズになる。
+        /// </summary>
+        private int ResolveCrouchSelection(int builtInCount)
+        {
+            if (!string.IsNullOrEmpty(_options.defaultCrouchPoseKey))
+            {
+                for (int i = 0; i < _crouchPackPoses.Count; i++)
+                {
+                    PosePack.ResolvedCrouchPose pose = _crouchPackPoses[i];
+                    if (PosePack.SupineCrouchInjector.MakeKey(pose.Pack, pose.Entry)
+                        != _options.defaultCrouchPoseKey) continue;
+
+                    return builtInCount + i;
+                }
+
+                _options.defaultCrouchPoseKey = string.Empty;
+            }
+
+            return CrouchPoseTable.IndexOf(_options.defaultCrouchPose);
+        }
+
+        /// <summary>
+        /// 選択肢の元になるパックの一覧を引き直す。
+        /// AssetDatabase を舐めるので、更新を押したときだけにする。
+        /// </summary>
+        private void RefreshCrouchPackPoses()
+        {
+            if (_crouchPackGeneration == _refreshGeneration) return;
+
+            _crouchPackGeneration = _refreshGeneration;
+            _crouchPackPoses = PosePack.SupinePosePackRegistry.ListCrouchEntries();
         }
 
         /// <summary>
@@ -702,6 +767,8 @@ namespace Supine
             _options.enableJumpAtDesktop = EditorPrefs.GetBool(PrefsKey("enableJumpAtDesktop"), _options.enableJumpAtDesktop);
             _options.defaultCrouchPose =
                 (CrouchPose)EditorPrefs.GetInt(PrefsKey("defaultCrouchPose"), (int)_options.defaultCrouchPose);
+            _options.defaultCrouchPoseKey =
+                EditorPrefs.GetString(PrefsKey("defaultCrouchPoseKey"), _options.defaultCrouchPoseKey);
             _options.sittingPose1 = (SittingPose)EditorPrefs.GetInt(PrefsKey("sittingPose1"), (int)_options.sittingPose1);
             _options.sittingPose2 = (SittingPose)EditorPrefs.GetInt(PrefsKey("sittingPose2"), (int)_options.sittingPose2);
         }
@@ -718,6 +785,7 @@ namespace Supine
             EditorPrefs.SetBool(PrefsKey("disableJumpMotion"), _options.disableJumpMotion);
             EditorPrefs.SetBool(PrefsKey("enableJumpAtDesktop"), _options.enableJumpAtDesktop);
             EditorPrefs.SetInt(PrefsKey("defaultCrouchPose"), (int)_options.defaultCrouchPose);
+            EditorPrefs.SetString(PrefsKey("defaultCrouchPoseKey"), _options.defaultCrouchPoseKey);
             EditorPrefs.SetInt(PrefsKey("sittingPose1"), (int)_options.sittingPose1);
             EditorPrefs.SetInt(PrefsKey("sittingPose2"), (int)_options.sittingPose2);
         }
