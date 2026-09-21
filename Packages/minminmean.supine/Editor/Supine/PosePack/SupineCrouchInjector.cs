@@ -63,11 +63,24 @@ namespace Supine.PosePack
                 return;
             }
 
-            BlendTree root = BuildRootTree(template, crouching.motion, controller, warnings);
+            // パックが足すしゃがみ。1つも無ければ従来どおりテンプレートの7種だけになる
+            List<ResolvedCrouchPose> packPoses =
+                SupinePosePackRegistry.ResolveCrouch(template, warnings);
+
+            BlendTree root = BuildRootTree(template, crouching.motion, controller, packPoses, warnings);
             if (root == null) return;
 
             crouching.motion = root;
-            ApplyDefaultPose(controller, maPrefabInstance, root, options.defaultCrouchPose);
+            SupineCrouchMenuBuilder.Build(maPrefabInstance, packPoses, warnings);
+            ApplyDefaultPose(controller, maPrefabInstance, root, options, packPoses);
+        }
+
+        /// <summary>
+        /// 既定にしたいしゃがみを指す文字列。パック側のポーズを選んだときだけ使う。
+        /// </summary>
+        public static string MakeKey(SupinePosePack pack, SupineCrouchEntry entry)
+        {
+            return pack.ResolvePackId() + "/" + entry.id;
         }
 
         /// <summary>
@@ -138,7 +151,8 @@ namespace Supine.PosePack
         /// こうすると Default は常に「そのアバターが元々そうだった姿」を意味する。
         /// </summary>
         private static BlendTree BuildRootTree(
-            BlendTree template, Motion originalMotion, AnimatorController controller, List<string> warnings)
+            BlendTree template, Motion originalMotion, AnimatorController controller,
+            IReadOnlyList<ResolvedCrouchPose> packPoses, List<string> warnings)
         {
             if (template.children.Length == 0)
             {
@@ -168,11 +182,86 @@ namespace Supine.PosePack
                 children[0].motion = originalMotion;
             }
 
-            root.children = children;
+            // パックのぶんを末尾へ足す。既存の枝の閾値は動かさないので、
+            // 前回保存されたメニューの選択はそのまま同じポーズを指し続ける
+            List<ChildMotion> all = new List<ChildMotion>(children);
+            foreach (ResolvedCrouchPose pose in packPoses)
+            {
+                BlendTree variant = BuildVariantTree(template, pose, controller, warnings);
+                if (variant == null) continue;
+
+                all.Add(new ChildMotion
+                {
+                    motion = variant,
+                    threshold = pose.Value,
+                    timeScale = 1f,
+                    position = Vector2.zero,
+                    directBlendParameter = string.Empty,
+                });
+            }
+
+            root.children = all.ToArray();
 
             // 生成物のコントローラに抱かせる。テンプレート側のアセットは書き換えない
             AssetDatabase.AddObjectToAsset(root, controller);
             return root;
+        }
+
+        /// <summary>
+        /// 1バリアントぶんの2Dロコモーションを作る。
+        ///
+        /// 方向の枝は既存のものをそのまま借りる。歩き・走りのクリップはミラーと
+        /// 逆再生で使い回されていて、7種のポーズが共有で4本しか使っていない。
+        /// 中心（位置 0,0）だけ差し替えれば、待機の姿勢がそのポーズのものになる。
+        /// おかげでバリアント1つの追加コストはクリップ1本で済む。
+        /// </summary>
+        private static BlendTree BuildVariantTree(
+            BlendTree template, ResolvedCrouchPose pose, AnimatorController controller, List<string> warnings)
+        {
+            BlendTree source = null;
+            foreach (ChildMotion child in template.children)
+            {
+                source = child.motion as BlendTree;
+                if (source != null) break;
+            }
+
+            if (source == null || source.children.Length == 0)
+            {
+                warnings.Add(
+                    "The crouch pose blend tree has no locomotion branch to copy. Crouch pose '" +
+                    pose.Entry.id + "' was skipped.");
+                return null;
+            }
+
+            ChildMotion[] children = source.children;
+
+            // 中心は添字で決め打ちにせず、位置で探す。並びが変わっても壊れない
+            int centre = 0;
+            float nearest = float.MaxValue;
+            for (int i = 0; i < children.Length; i++)
+            {
+                float distance = children[i].position.sqrMagnitude;
+                if (distance >= nearest) continue;
+
+                nearest = distance;
+                centre = i;
+            }
+
+            children[centre].motion = pose.Entry.clip;
+
+            BlendTree variant = new BlendTree
+            {
+                name = pose.Entry.ResolveDisplayName(),
+                blendType = source.blendType,
+                blendParameter = source.blendParameter,
+                blendParameterY = source.blendParameterY,
+                useAutomaticThresholds = false,
+                hideFlags = HideFlags.HideInHierarchy,
+            };
+            variant.children = children;
+
+            AssetDatabase.AddObjectToAsset(variant, controller);
+            return variant;
         }
 
         /// <summary>
@@ -182,16 +271,35 @@ namespace Supine.PosePack
         /// 黙ってずれて「起動時だけ違うポーズ」という気付きにくい不具合になる。
         /// </summary>
         private static void ApplyDefaultPose(
-            AnimatorController controller, GameObject maPrefabInstance, BlendTree root, CrouchPose pose)
+            AnimatorController controller, GameObject maPrefabInstance, BlendTree root,
+            SupineCombineOptions options, IReadOnlyList<ResolvedCrouchPose> packPoses)
         {
-            int index = CrouchPoseTable.ChildIndex(pose);
-            if (index < 0 || index >= root.children.Length) index = 0;
-
-            float value = root.children[index].threshold;
+            float value = ResolveDefaultValue(root, options, packPoses);
 
             SetAnimatorParameterDefault(controller, value);
             SetMenuParameterDefault(maPrefabInstance, value);
-            MarkDefaultMenuItem(maPrefabInstance, index);
+            MarkDefaultMenuItem(maPrefabInstance, value);
+        }
+
+        private static float ResolveDefaultValue(
+            BlendTree root, SupineCombineOptions options, IReadOnlyList<ResolvedCrouchPose> packPoses)
+        {
+            // パック側を選んでいたなら、そのポーズが今回も居るときだけ採用する。
+            // パックを外したまま組み直したときに、存在しない枠を既定にしないため
+            if (!string.IsNullOrEmpty(options.defaultCrouchPoseKey))
+            {
+                foreach (ResolvedCrouchPose pose in packPoses)
+                {
+                    if (MakeKey(pose.Pack, pose.Entry) == options.defaultCrouchPoseKey) return pose.Value;
+                }
+            }
+
+            // 組み込みのぶんは従来どおりツリーから引く。
+            // 数値を別に持つと、ツリーの並びを変えたときに黙ってずれる
+            int index = CrouchPoseTable.ChildIndex(options.defaultCrouchPose);
+            if (index < 0 || index >= root.children.Length) index = 0;
+
+            return root.children[index].threshold;
         }
 
         private static void SetAnimatorParameterDefault(AnimatorController controller, float value)
@@ -232,18 +340,22 @@ namespace Supine.PosePack
 
         /// <summary>
         /// メニュー上でも既定のポーズに印を移す。
+        ///
+        /// 並びの何番目かではなく、項目が書き込む値で合わせる。
+        /// 項目が増えてページ送りが出ると、番号と枠番号は一致しなくなる。
         /// </summary>
-        private static void MarkDefaultMenuItem(GameObject maPrefabInstance, int index)
+        private static void MarkDefaultMenuItem(GameObject maPrefabInstance, float value)
         {
             Transform menu = FindDescendant(maPrefabInstance.transform, CrouchMenuName);
             if (menu == null) return;
 
-            for (int i = 0; i < menu.childCount; i++)
+            foreach (ModularAvatarMenuItem item in menu.GetComponentsInChildren<ModularAvatarMenuItem>(true))
             {
-                ModularAvatarMenuItem item = menu.GetChild(i).GetComponent<ModularAvatarMenuItem>();
-                if (item == null) continue;
+                if (item.Control == null) continue;
+                if (item.Control.parameter == null) continue;
+                if (item.Control.parameter.name != CrouchPoseParameter) continue;
 
-                item.isDefault = i == index;
+                item.isDefault = Mathf.Abs(item.Control.value - value) < SupineCrouchValues.Step * 0.25f;
                 EditorUtility.SetDirty(item);
             }
         }

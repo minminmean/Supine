@@ -22,6 +22,20 @@ namespace Supine.PosePack
     }
 
     /// <summary>
+    /// 採番まで済ませたしゃがみポーズ1つ分。
+    /// </summary>
+    internal sealed class ResolvedCrouchPose
+    {
+        public SupinePosePack Pack;
+        public SupineCrouchEntry Entry;
+
+        /// <summary>割り当てられた枠番号。CrouchPose の値はここから引く</summary>
+        public int Index = -1;
+
+        public float Value { get { return SupineCrouchValues.ToValue(Index); } }
+    }
+
+    /// <summary>
     /// プロジェクト内の SupinePosePack を集めて、VRCSupine の値を割り当てる。
     ///
     /// ごろ寝システム側から個々のパックを参照することはできない。
@@ -86,6 +100,163 @@ namespace Supine.PosePack
             // 番号が取れなかったものは落とす
             resolved.RemoveAll(pose => pose.Value <= 0);
             return resolved;
+        }
+
+        /// <summary>
+        /// しゃがみポーズを集め、枠番号を割り当てて返す。
+        ///
+        /// 寝ポーズと違い、こちらはステートを増やさない。テンプレートのツリーに
+        /// 枝を足すだけなので、必要なのは枝の番号だけになる。
+        /// </summary>
+        /// <param name="template">テンプレートの根ツリー。埋まっている番号をここから読む</param>
+        public static List<ResolvedCrouchPose> ResolveCrouch(BlendTree template, List<string> warnings)
+        {
+            List<SupinePosePack> packs = CollectPacks();
+            List<ResolvedCrouchPose> resolved = new List<ResolvedCrouchPose>();
+            if (packs.Count == 0) return resolved;
+
+            HashSet<int> usedIndices = CollectUsedCrouchIndices(template);
+            HashSet<string> usedIds = new HashSet<string>();
+            List<ResolvedCrouchPose> needsIndex = new List<ResolvedCrouchPose>();
+
+            foreach (SupinePosePack pack in packs)
+            {
+                if (pack.crouchPoses == null) continue;
+
+                foreach (SupineCrouchEntry entry in pack.crouchPoses)
+                {
+                    if (!ValidateCrouch(pack, entry, usedIds, warnings)) continue;
+
+                    ResolvedCrouchPose pose = new ResolvedCrouchPose { Pack = pack, Entry = entry };
+
+                    // 0番は Default（そのアバターが元々そうだった姿）の指定席なので譲らない
+                    if (entry.preferredValue > 0 && !usedIndices.Contains(entry.preferredValue))
+                    {
+                        pose.Index = entry.preferredValue;
+                        usedIndices.Add(entry.preferredValue);
+                    }
+                    else
+                    {
+                        if (entry.preferredValue > 0)
+                        {
+                            warnings.Add(
+                                "Crouch pose " + DescribeCrouch(pack, entry) + " wants slot " +
+                                entry.preferredValue + ", but it is already taken. " +
+                                "A free slot was assigned instead.");
+                        }
+                        needsIndex.Add(pose);
+                    }
+
+                    resolved.Add(pose);
+                }
+            }
+
+            AssignFreeIndices(needsIndex, usedIndices, warnings);
+
+            resolved.RemoveAll(pose => pose.Index < 0);
+            return resolved;
+        }
+
+        /// <summary>
+        /// しゃがみポーズを並び順だけ確定させて返す。採番はしない。
+        ///
+        /// 組込ウィンドウが「既定にするポーズ」の選択肢を並べるためのもの。
+        /// 枠番号はテンプレートのツリーを見ないと決まらないが、
+        /// 選択肢を出すだけならパックの中身が分かれば足りる。
+        /// </summary>
+        public static List<ResolvedCrouchPose> ListCrouchEntries()
+        {
+            List<ResolvedCrouchPose> entries = new List<ResolvedCrouchPose>();
+            HashSet<string> usedIds = new HashSet<string>();
+            List<string> ignored = new List<string>();
+
+            foreach (SupinePosePack pack in CollectPacks())
+            {
+                if (pack.crouchPoses == null) continue;
+
+                foreach (SupineCrouchEntry entry in pack.crouchPoses)
+                {
+                    if (!ValidateCrouch(pack, entry, usedIds, ignored)) continue;
+
+                    entries.Add(new ResolvedCrouchPose { Pack = pack, Entry = entry });
+                }
+            }
+
+            return entries;
+        }
+
+        /// <summary>
+        /// テンプレートのツリーが既に使っている枠番号。
+        ///
+        /// 個数ではなく閾値から引く。枝の並びと番号は本来別物で、
+        /// 個数で数えると並び替えたときに黙ってずれる。
+        /// </summary>
+        private static HashSet<int> CollectUsedCrouchIndices(BlendTree template)
+        {
+            HashSet<int> indices = new HashSet<int>();
+            if (template == null) return indices;
+
+            foreach (ChildMotion child in template.children)
+            {
+                int index = SupineCrouchValues.ToIndex(child.threshold);
+                if (index >= 0) indices.Add(index);
+            }
+            return indices;
+        }
+
+        private static void AssignFreeIndices(
+            List<ResolvedCrouchPose> needsIndex, HashSet<int> usedIndices, List<string> warnings)
+        {
+            // 1から探す。0は Default の指定席
+            int next = 1;
+
+            foreach (ResolvedCrouchPose pose in needsIndex)
+            {
+                while (next <= SupineCrouchValues.MaxIndex && usedIndices.Contains(next)) next++;
+
+                if (next > SupineCrouchValues.MaxIndex)
+                {
+                    warnings.Add(
+                        "Ran out of crouch pose slots. " + DescribeCrouch(pose.Pack, pose.Entry) +
+                        " was skipped. A synced float only reaches " +
+                        (SupineCrouchValues.MaxIndex + 1) + " distinct values at this spacing.");
+                    continue;
+                }
+
+                pose.Index = next;
+                usedIndices.Add(next);
+            }
+        }
+
+        private static bool ValidateCrouch(
+            SupinePosePack pack, SupineCrouchEntry entry, HashSet<string> usedIds, List<string> warnings)
+        {
+            if (entry == null || string.IsNullOrEmpty(entry.id))
+            {
+                warnings.Add("Pack '" + pack.ResolvePackId() + "' has a crouch pose with no id. It was skipped.");
+                return false;
+            }
+
+            if (entry.clip == null)
+            {
+                warnings.Add("Crouch pose " + DescribeCrouch(pack, entry) + " has no animation clip. It was skipped.");
+                return false;
+            }
+
+            if (!usedIds.Add(pack.ResolvePackId() + "/" + entry.id))
+            {
+                warnings.Add(
+                    "Pack '" + pack.ResolvePackId() + "' declares the crouch pose id '" + entry.id +
+                    "' more than once. The duplicate was skipped.");
+                return false;
+            }
+
+            return true;
+        }
+
+        private static string DescribeCrouch(SupinePosePack pack, SupineCrouchEntry entry)
+        {
+            return "'" + entry.id + "' in pack '" + pack.ResolvePackId() + "'";
         }
 
         /// <summary>
