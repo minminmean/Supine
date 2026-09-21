@@ -46,6 +46,9 @@ namespace Supine
         /// </summary>
         internal const string ProneStateName = "Prone";
 
+        /// <summary>立ち状態にあたるステート（テンプレート側の名前）。</summary>
+        internal const string StandingStateName = "Standing";
+
         /// <summary>
         /// 「しゃがみから伏せへ降りる」遷移の目印になるパラメータ。VRChat標準のUpright。
         /// 入口ステートからこの条件（less than）で降りる先が、そのアニメーターでの伏せ状態にあたる。
@@ -151,6 +154,64 @@ namespace Supine
         /// 入口ステートから「伏せへ降りる」遷移の遷移先を、遷移の並び順のまま集める。
         /// 先頭がそのアニメーターでの伏せ状態、2つ目以降はごろ寝システムと競合する遷移先。
         /// </summary>
+        /// <summary>
+        /// 継承元にする立ち・しゃがみ・伏せのステートを推測する。
+        ///
+        /// 既成のアニメーターはステート名を変えていることが多く、名前一致だけでは拾えない。
+        /// 追加モードが入口を推測するのと同じ手掛かり、つまり
+        /// 「デフォルトステート（＝立ち）から Upright less than で降りた先がしゃがみ、
+        /// そこからさらに降りた先が伏せ」という構造から辿る。
+        ///
+        /// 追加モードの InferEntryStateName と違い、しゃがみが見つからないときに
+        /// デフォルトステートで代用することはしない。継承では
+        /// 立ちのモーションをしゃがみに引き写すことになってしまうため。
+        /// </summary>
+        /// <returns>テンプレート側の名前 → 継承元のステート名。推測できなかったものは含めない</returns>
+        internal static Dictionary<string, string> InferInheritSourceStateNames(AnimatorController source)
+        {
+            Dictionary<string, string> inferred = new Dictionary<string, string>();
+            if (source == null || source.layers.Length == 0 || source.layers[0].stateMachine == null)
+            {
+                return inferred;
+            }
+
+            AnimatorStateMachine root = source.layers[0].stateMachine;
+            Dictionary<string, AnimatorState> states = AnimatorStateUtility.BuildStateIndex(root);
+            AnimatorState defaultState = root.defaultState;
+
+            string standing = states.ContainsKey(StandingStateName)
+                ? StandingStateName
+                : defaultState != null ? defaultState.name : null;
+
+            string crouching = states.ContainsKey(EntryStateName)
+                ? EntryStateName
+                : FirstLieDownDestination(defaultState);
+
+            string prone = states.ContainsKey(ProneStateName)
+                ? ProneStateName
+                : FirstLieDownDestination(FindState(states, crouching));
+
+            if (!string.IsNullOrEmpty(standing))  inferred[StandingStateName] = standing;
+            if (!string.IsNullOrEmpty(crouching)) inferred[EntryStateName]    = crouching;
+            if (!string.IsNullOrEmpty(prone))     inferred[ProneStateName]    = prone;
+
+            return inferred;
+        }
+
+        private static AnimatorState FindState(Dictionary<string, AnimatorState> states, string name)
+        {
+            if (string.IsNullOrEmpty(name)) return null;
+            return states.TryGetValue(name, out AnimatorState state) ? state : null;
+        }
+
+        private static string FirstLieDownDestination(AnimatorState from)
+        {
+            List<AnimatorState> destinations = AnimatorStateUtility.CollectDestinationsByCondition(
+                from, LieDownConditionParameter, AnimatorConditionMode.Less);
+
+            return destinations.Count > 0 ? destinations[0].name : null;
+        }
+
         internal static List<AnimatorState> CollectLieDownDestinations(
             AnimatorController target, string entryStateName)
         {

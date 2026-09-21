@@ -25,7 +25,7 @@ namespace Supine
         private readonly VRCAvatarDescriptor _avatarDescriptor;
         private readonly SupineVariant _variant;
         private readonly string _versionFolderName;
-        private string _avatarNameWithSuffix;
+        private readonly string _avatarName;
 
         public bool CanCombine { get; private set; } = true;
 
@@ -38,7 +38,7 @@ namespace Supine
         public SupineCombiner(GameObject avatar, SupineVariant variant, string versionFolderName)
         {
             _avatar = avatar;
-            _avatarNameWithSuffix = AssetPathUtility.SanitizeFileName(avatar.name);
+            _avatarName = AssetPathUtility.SanitizeFileName(avatar.name);
             _avatarDescriptor = avatar.GetComponent<VRCAvatarDescriptor>();
             _variant = variant;
             _versionFolderName = versionFolderName;
@@ -54,13 +54,6 @@ namespace Supine
                 // guids.jsonが読めていない、または内容が欠けている
                 Debug.LogError("[VRCSupine] Could not resolve the Supine variant assets. Check guids.json.");
                 CanCombine = false;
-            }
-            else if (HasGeneratedFiles())
-            {
-                //  すでに組込済みの場合、(アバター名)_(数字)で作れるようになるまでループ回す
-                int suffix = 1;
-                while (HasGeneratedFiles(suffix)) suffix++;
-                _avatarNameWithSuffix += "_" + suffix.ToString();
             }
         }
 
@@ -112,6 +105,12 @@ namespace Supine
             }
             SetSittingAnimations(supineLocomotion, options.sittingPose1, options.sittingPose2, renamedStates);
 
+            // プロジェクトに置かれたポーズパックを差し込む。
+            // パックが1つも無ければ何も起きないため、従来どおりの生成物になる
+            List<string> posePackWarnings = new List<string>();
+            List<PosePack.ResolvedPose> injectedPoses = InjectPosePacks(
+                supineLocomotion, options, renamedStates, posePackWarnings);
+
             EditorUtility.SetDirty(supineLocomotion);
             AssetDatabase.SaveAssets();
 
@@ -136,6 +135,25 @@ namespace Supine
             component.mergeAnimatorMode = MergeAnimatorMode.Replace;
 
             EditorUtility.SetDirty(component);
+
+            // 差し込んだポーズのメニュー項目を生やす。
+            // コントローラ側の採番とここが同じ並びを使うので、値の対応がずれない
+            PosePack.SupinePoseMenuBuilder.Build(maPrefabInstance, injectedPoses, posePackWarnings);
+
+            // しゃがみポーズの切り替えを組み込む。
+            // ポーズとは別の軸なので、パックが1つも無くても効く
+            PosePack.SupineCrouchInjector.Inject(
+                supineLocomotion, maPrefabInstance,
+                BuildPoseStateNameMap(options, renamedStates), options, posePackWarnings);
+
+            // 根ツリーをコントローラの子アセットとして抱かせたので、書き出し直す
+            EditorUtility.SetDirty(supineLocomotion);
+            AssetDatabase.SaveAssets();
+
+            foreach (string warning in posePackWarnings)
+            {
+                Debug.LogWarning("[VRCSupine] " + warning);
+            }
 
             // 設置済みのMA Prefabを整理
             SortAndCleanMAPrefabs(maPrefabInstance, oldPrefabs);
@@ -319,6 +337,64 @@ namespace Supine
         }
 
         /// <summary>
+        /// プロジェクト内のポーズパックを集め、コントローラへ差し込む。
+        ///
+        /// パッケージからアセットは参照できないため、こちらがパックを知ることはできない。
+        /// AssetDatabaseから拾う形にして、依存の向きを一方向に保つ。
+        /// </summary>
+        /// <returns>差し込めたポーズの一覧。メニュー生成が同じ並びを使う</returns>
+        private List<PosePack.ResolvedPose> InjectPosePacks(
+            AnimatorController supineLocomotion,
+            SupineCombineOptions options,
+            IReadOnlyDictionary<string, string> renamedStates,
+            List<string> warnings)
+        {
+            List<PosePack.ResolvedPose> resolved =
+                PosePack.SupinePosePackRegistry.Resolve(supineLocomotion, warnings);
+
+            if (resolved.Count == 0) return resolved;
+
+            return new PosePack.SupinePoseInjector(
+                    supineLocomotion, BuildPoseStateNameMap(options, renamedStates), warnings)
+                .Inject(resolved);
+        }
+
+        /// <summary>
+        /// テンプレート側のステート名から、生成物での実名を引く表を作る。
+        ///
+        /// 追加モードでは食い違いが2種類ある。
+        /// ・流用したステート（しゃがみ、伏せ）は追加先の名前になる。こちらはRenamedStatesに載らない
+        /// ・複製したステートは名前が衝突するとUnityが連番を付ける。こちらはRenamedStatesに載る
+        /// 前者を拾い損ねると、入口のステート名を変えているアバターでポーズが黙って増えなくなる。
+        /// </summary>
+        private static IReadOnlyDictionary<string, string> BuildPoseStateNameMap(
+            SupineCombineOptions options, IReadOnlyDictionary<string, string> renamedStates)
+        {
+            Dictionary<string, string> map = new Dictionary<string, string>();
+
+            if (options.mode == SupineCombineMode.Add)
+            {
+                foreach (KeyValuePair<string, string> pair in
+                         SupineLocomotionAdder.BuildStateNameOverrides(options))
+                {
+                    // 空文字は「対応するステートを持たせない」の意味なので、名前としては使えない
+                    if (string.IsNullOrEmpty(pair.Value)) continue;
+                    map[pair.Key] = pair.Value;
+                }
+            }
+
+            if (renamedStates != null)
+            {
+                foreach (KeyValuePair<string, string> pair in renamedStates)
+                {
+                    map[pair.Key] = pair.Value;
+                }
+            }
+
+            return map;
+        }
+
+        /// <summary>
         /// 座りモーションの設定
         /// </summary>
         /// <param name="supineLocomotion">ごろ寝システムのBaseコントローラ</param>
@@ -426,35 +502,22 @@ namespace Supine
         private T CopyAssetFrom<T>(string templatePath) where T : Object
         {
             string templateName = AssetPathUtility.SanitizeFileName(Path.GetFileName(templatePath));
-            string destinationPath = MakeGeneratedDirPath() + "/" + _avatarNameWithSuffix + "_" + templateName;
+
+            // 組み込むたびにフォルダごと増えると探しにくいので、
+            // フォルダはアバターごとに1つに固定して、同名になるときだけファイル名に連番を足す
+            string destinationPath = AssetPathUtility.MakeUniqueAssetPath(
+                MakeGeneratedDirPath() + "/" + _avatarName + "_" + templateName);
 
             return AssetPathUtility.CopyAssetFromPath<T>(templatePath, destinationPath);
         }
 
         /// <summary>
-        /// 生成したごろ寝システムコントローラを置くディレクトリパスを作成
+        /// 生成したごろ寝システムコントローラを置くディレクトリパスを作成。
+        /// アバターごとに1つで、組み込み直しても増えない。
         /// </summary>
-        /// <param name="suffix">int 後ろにつける数字</param>
-        private string MakeGeneratedDirPath(int suffix = 0)
+        private string MakeGeneratedDirPath()
         {
-            string generatedDirPath = MmmAssetPath + '/' + _versionFolderName + "/Generated";
-            if (suffix > 0) {
-                return generatedDirPath + "/" + _avatarNameWithSuffix + "_" + suffix.ToString();
-            }
-            else
-            {
-                return generatedDirPath + "/" + _avatarNameWithSuffix;
-            }
-        }
-
-        /// <summary>
-        /// すでに作成されたファイルがあるか判定
-        /// </summary>
-        /// <param name="suffix">int 後ろにつける数字</param>
-        /// <returns>bool</returns>
-        private bool HasGeneratedFiles(int suffix = 0)
-        {
-            return AssetDatabase.IsValidFolder(MakeGeneratedDirPath(suffix));
+            return MmmAssetPath + '/' + _versionFolderName + "/Generated/" + _avatarName;
         }
     }
 }

@@ -39,6 +39,21 @@ namespace Supine
         /// </summary>
         public string proneStateName;
 
+        /// <summary>
+        /// 既存のしゃがみポーズ切り替えを優先するか。
+        ///
+        /// 他のポーズツールが同じ手法（しゃがみステートに入れ子のブレンドツリーを差す）を
+        /// 使っていた場合、こちらが差し替えると相手の切り替えを乗っ取ることになる。
+        /// 入れ子を検出したときだけUIに出し、どちらを活かすか選ばせる。
+        /// </summary>
+        public bool keepExistingCrouchPose;
+
+        /// <summary>
+        /// 既定にするしゃがみポーズ。CrouchPose パラメータの初期値になる。
+        /// 実際の数値はブレンドツリーの閾値から引くため、ここは添字だけを持つ。
+        /// </summary>
+        public CrouchPose defaultCrouchPose;
+
         public bool disableJumpMotion;
         public bool enableJumpAtDesktop;
 
@@ -56,6 +71,8 @@ namespace Supine
                     addTargetOverride             = null,
                     entryStateName                = null,
                     proneStateName                = null,
+                    keepExistingCrouchPose        = false,
+                    defaultCrouchPose             = CrouchPose.Default,
                     disableJumpMotion             = true,
                     enableJumpAtDesktop           = true,
                     sittingPose1                  = SittingPose.Petan,

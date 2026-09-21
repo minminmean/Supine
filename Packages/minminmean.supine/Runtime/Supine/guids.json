@@ -16,6 +16,11 @@
         }
     },
 
+    "crouch":
+    {
+        "pose_tree":            "bb05559edaa781146b9cc26e16dd952f"
+    },
+
     "vrchat":
     {
         "default_locomotion":   "4e4e1a372a526074884b7311d6fc686b"
