@@ -190,7 +190,7 @@ MonoBehaviour:
     type: 102
     parameter:
       name: CrouchPose
-    value: 2
+    value: 0.25
     style: 0
     subMenu: {fileID: 0}
     subParameters: []
@@ -649,7 +649,7 @@ MonoBehaviour:
     type: 102
     parameter:
       name: CrouchPose
-    value: 3
+    value: 0.375
     style: 0
     subMenu: {fileID: 0}
     subParameters: []
@@ -813,7 +813,7 @@ MonoBehaviour:
     type: 102
     parameter:
       name: CrouchPose
-    value: 6
+    value: 0.75
     style: 0
     subMenu: {fileID: 0}
     subParameters: []
@@ -878,7 +878,7 @@ MonoBehaviour:
     type: 102
     parameter:
       name: CrouchPose
-    value: 1
+    value: 0.125
     style: 0
     subMenu: {fileID: 0}
     subParameters: []
@@ -1008,7 +1008,7 @@ MonoBehaviour:
     type: 102
     parameter:
       name: CrouchPose
-    value: 5
+    value: 0.625
     style: 0
     subMenu: {fileID: 0}
     subParameters: []
@@ -1616,7 +1616,7 @@ MonoBehaviour:
     type: 102
     parameter:
       name: CrouchPose
-    value: 4
+    value: 0.5
     style: 0
     subMenu: {fileID: 0}
     subParameters: []
