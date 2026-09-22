@@ -54,7 +54,7 @@ namespace Supine.PosePack
                 return;
             }
 
-            // 置き場所ごとにまとめる。EX版のように既存のサブメニュー名を名乗れば、そこへ合流する
+            // 置き場所ごとにまとめる。既存のサブメニュー名を名乗れば、そこへ合流する
             List<string> folderOrder = new List<string>();
             Dictionary<string, List<ResolvedPose>> folders = new Dictionary<string, List<ResolvedPose>>();
             HashSet<string> adjustFolders = new HashSet<string>();
@@ -202,10 +202,10 @@ namespace Supine.PosePack
                 labels = new VRCExpressionsMenu.Control.Label[0],
             };
 
-            // EX版が持っていた Ex Adjust と同じ設定にする
+            // 同期と保存は MA Parameters の宣言が優先されるが、紛らわしくないよう揃えておく（保存しない）
             item.MenuSource = SubmenuSource.Children;
             item.isSynced = true;
-            item.isSaved = true;
+            item.isSaved = false;
             item.isDefault = false;
             item.automaticValue = true;
 
@@ -265,7 +265,7 @@ namespace Supine.PosePack
             // せっかく採番した VRCSupine の値を Modular Avatar が振り直してしまう
             item.MenuSource = SubmenuSource.Children;
             item.isSynced = true;
-            item.isSaved = true;
+            item.isSaved = false;
             item.isDefault = false;
             item.automaticValue = false;
 

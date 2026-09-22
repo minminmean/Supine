@@ -21,10 +21,10 @@ namespace Supine.PosePack
         public const string PoseParameter = "VRCSupine";
 
         /// <summary>クリップのキーの間をスクラブする軸。メニュー側もこれを回す</summary>
-        public const string AdjustParameter = "VRCSupineExAdjust";
+        public const string AdjustParameter = "VRCSupinePoseAdjust";
 
         /// <summary>調整中であることを示すフラグ。ラジアルを開いている間だけ立つ</summary>
-        public const string AdjustingParameter = "VRCSupineExAdjusting";
+        public const string AdjustingParameter = "VRCSupinePoseAdjusting";
         private const string UprightParameter = "Upright";
         private const string LockPoseParameter = "VRCLockPose";
         private const string PoseChangedParameter = "PoseChanged";
@@ -165,7 +165,7 @@ namespace Supine.PosePack
             state.speed = 1f;
             state.mirror = false;
 
-            // クリップのキーの間を Ex Adjust でスクラブする。
+            // クリップのキーの間を Pose Adjust でスクラブする。
             // これがあるおかげで、ポーズを何個増やしても同期パラメータは1ビットも増えない
             state.timeParameterActive = true;
             state.timeParameter = AdjustParameter;

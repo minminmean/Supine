@@ -1124,7 +1124,7 @@ MonoBehaviour:
     saved: 1
     hasExplicitDefaultValue: 1
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: VRCSupineExAdjust
+  - nameOrPrefix: VRCSupinePoseAdjust
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -1134,7 +1134,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 1
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: VRCSupineExAdjusting
+  - nameOrPrefix: VRCSupinePoseAdjusting
     remapTo: 
     internalParameter: 0
     isPrefix: 0
