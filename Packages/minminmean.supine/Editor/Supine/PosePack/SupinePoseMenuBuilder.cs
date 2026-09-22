@@ -18,7 +18,8 @@ namespace Supine.PosePack
     /// ページを送ることになり、目的のポーズに辿り着くまでの手数が増える。
     ///
     /// パックのメニューは Supine Poses の直後に並べ、Crouch Poses・Misc・Foot Anchor は
-    /// 常にその後ろへ送り直す。
+    /// 常にその後ろへ送り直す。パックが増えてトップレベルが溢れたら、
+    /// <see cref="PaginateRoot"/> がそれらを各ページの末尾に置いたまま「Next」で送る。
     /// </summary>
     internal static class SupinePoseMenuBuilder
     {
@@ -106,8 +107,81 @@ namespace Supine.PosePack
                 Transform trailing = FindChild(posesRoot, name);
                 if (trailing != null) trailing.SetAsLastSibling();
             }
+        }
 
-            WarnIfOverCapacity(posesRoot, warnings);
+        /// <summary>
+        /// トップレベルが上限を超えたら「Next」でページを送る。
+        ///
+        /// Crouch Poses・Misc・Foot Anchor はどのページの末尾にも置く。
+        /// 並びは1ページ目が「Supine Poses / パック … / Crouch Poses / Misc / Foot Anchor / Next」、
+        /// 2ページ目以降が「パック … / Crouch Poses / Misc / Foot Anchor」。
+        ///
+        /// 末尾の項目は複製して配るので、中身が出来上がってから呼ぶこと。
+        /// しゃがみの組込より前に畳むと、Crouch Poses の複製にパックのしゃがみが入らず、
+        /// 既存の切り替えを活かす場合も1枚目しか消えない。
+        /// </summary>
+        public static void PaginateRoot(GameObject maPrefabInstance, List<string> warnings)
+        {
+            Transform posesRoot = FindDescendant(maPrefabInstance.transform, RootMenuName);
+            if (posesRoot == null || posesRoot.childCount <= MenuCapacity) return;
+
+            List<Transform> trailing = new List<Transform>();
+            foreach (string name in TrailingMenuNames)
+            {
+                Transform item = FindChild(posesRoot, name);
+                if (item != null) trailing.Add(item);
+            }
+
+            List<Transform> body = new List<Transform>();
+            foreach (Transform child in posesRoot)
+            {
+                if (!trailing.Contains(child)) body.Add(child);
+            }
+
+            // 末尾の項目と送りを置いたら1枠も残らないなら、ページを送っても進まない
+            if (MenuCapacity - trailing.Count - 1 <= 0)
+            {
+                WarnIfOverCapacity(posesRoot, warnings);
+                return;
+            }
+
+            ModularAvatarMenuItem rootItem = posesRoot.GetComponent<ModularAvatarMenuItem>();
+            Texture2D icon = rootItem != null && rootItem.Control != null ? rootItem.Control.icon : null;
+
+            Transform page = posesRoot;
+            int index = 0;
+
+            while (true)
+            {
+                int capacity = MenuCapacity - trailing.Count;
+                int remaining = body.Count - index;
+
+                // 収まらないなら、送りのぶんもさらに1枠要る
+                bool needsNextPage = remaining > capacity;
+                if (needsNextPage) capacity--;
+
+                int count = Mathf.Min(capacity, remaining);
+
+                // 1ページ目は元から並んでいるので、送った先のページにだけ移す
+                if (page != posesRoot)
+                {
+                    for (int i = 0; i < count; i++)
+                    {
+                        Undo.SetTransformParent(body[index + i], page, "Create Supine Pose Menu");
+                        body[index + i].SetAsLastSibling();
+                    }
+                    foreach (Transform item in trailing)
+                    {
+                        CopyItem(item.gameObject, page);
+                    }
+                }
+                index += count;
+
+                if (!needsNextPage) return;
+
+                page = CreateSubMenu(page, NextPageName, icon);
+                page.SetAsLastSibling();
+            }
         }
 
         /// <summary>
