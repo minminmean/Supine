@@ -145,6 +145,9 @@ namespace Supine
                 supineLocomotion, maPrefabInstance,
                 BuildPoseStateNameMap(options, renamedStates), options, posePackWarnings);
 
+            // 末尾の項目を各ページへ複製するので、しゃがみのメニューが出来上がってから畳む
+            PosePack.SupinePoseMenuBuilder.PaginateRoot(maPrefabInstance, posePackWarnings);
+
             // 根ツリーをコントローラの子アセットとして抱かせたので、書き出し直す
             EditorUtility.SetDirty(supineLocomotion);
             AssetDatabase.SaveAssets();
