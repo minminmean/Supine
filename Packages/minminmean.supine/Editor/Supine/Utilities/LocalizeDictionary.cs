@@ -55,7 +55,7 @@ namespace Supine.Utilities
         public string check_successful_warning_message;
         public string check_failure;
         public string check_failure_message;
-        public string check_failure_variant_message;
+        public string check_failure_template_message;
         public string check_failure_add_target_message;
         public string check_failure_add_layer_message;
         public string check_failure_add_entry_message;

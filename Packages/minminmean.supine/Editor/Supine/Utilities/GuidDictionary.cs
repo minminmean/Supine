@@ -5,23 +5,18 @@ using UnityEditor.Animations;
 namespace Supine.Utilities
 {
     /// <summary>
-    /// 各パッケージが持つ guids.json のスキーマ。
-    /// バリアント（通常版 / EX版）はそれぞれ自分のパッケージ内の guids.json に
-    /// variant ノードを持ち、そこから自分用のPrefabとコントローラを指す。
-    /// JsonUtilityは欠けたフィールドを既定値にするため、
-    /// EX版のようにvariantしか持たないJSONも同じ構造体で読める。
+    /// ごろ寝システムの guids.json のスキーマ。
     /// </summary>
     [Serializable]
     public struct GuidDictionary
     {
-        public SupineVariant variant;
+        public SupineTemplate template;
         public Animations animations;
         public Crouch crouch;
         public VRChat vrchat;
 
         /// <summary>
         /// VRChat SDKが持つアセットのGUID。
-        /// バリアント間で共通のため、ごろ寝システム本体の guids.json だけが持つ。
         /// </summary>
         [Serializable]
         public struct VRChat
@@ -31,7 +26,7 @@ namespace Supine.Utilities
 
         /// <summary>
         /// しゃがみポーズ切り替えのブレンドツリー。
-        /// バリアントを足すときはこのツリーに子を足すだけでよく、
+        /// ポーズを足すときはこのツリーに子を足すだけでよく、
         /// メニューの項目はツリーの子から生成されるため二重管理にならない。
         /// </summary>
         [Serializable]
@@ -57,11 +52,11 @@ namespace Supine.Utilities
     }
 
     /// <summary>
-    /// ごろ寝システム1バリアントを構成するアセットのGUID。
+    /// 組込時にコピーして使うMA Prefabとコントローラのテンプレート。
     /// バージョン文字列はパッケージの package.json から取得するため、ここには含めない。
     /// </summary>
     [Serializable]
-    public struct SupineVariant
+    public struct SupineTemplate
     {
         public string prefab;
         public string controller;
@@ -69,7 +64,7 @@ namespace Supine.Utilities
         public bool IsValid => !string.IsNullOrEmpty(prefab) && !string.IsNullOrEmpty(controller);
 
         /// <summary>
-        /// このバリアントのテンプレートコントローラを読む。読めなければ null。
+        /// テンプレートのコントローラを読む。読めなければ null。
         /// 読むだけで、このアセットを書き換えてはいけない。
         /// </summary>
         public AnimatorController LoadController()

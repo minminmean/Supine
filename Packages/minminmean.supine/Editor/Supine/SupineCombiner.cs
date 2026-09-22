@@ -23,7 +23,7 @@ namespace Supine
 
         private readonly GameObject _avatar;
         private readonly VRCAvatarDescriptor _avatarDescriptor;
-        private readonly SupineVariant _variant;
+        private readonly SupineTemplate _template;
         private readonly string _versionFolderName;
         private readonly string _avatarName;
 
@@ -33,14 +33,13 @@ namespace Supine
         /// Constructor
         /// </summary>
         /// <param name="avatar">GameObject アバター</param>
-        /// <param name="variant">SupineVariant 設置するバリアント（通常版 / EX版）</param>
         /// <param name="versionFolderName">string 生成先フォルダ名（例: "Supine v4.5.1"）</param>
-        public SupineCombiner(GameObject avatar, SupineVariant variant, string versionFolderName)
+        public SupineCombiner(GameObject avatar, string versionFolderName)
         {
             _avatar = avatar;
             _avatarName = AssetPathUtility.SanitizeFileName(avatar.name);
             _avatarDescriptor = avatar.GetComponent<VRCAvatarDescriptor>();
-            _variant = variant;
+            _template = JsonHelper.GetGuidList().template;
             _versionFolderName = versionFolderName;
 
             if (_avatarDescriptor == null)
@@ -49,10 +48,10 @@ namespace Supine
                 Debug.LogError("[VRCSupine] Could not find VRCAvatarDescriptor.");
                 CanCombine = false;
             }
-            else if (!_variant.IsValid)
+            else if (!_template.IsValid)
             {
                 // guids.jsonが読めていない、または内容が欠けている
-                Debug.LogError("[VRCSupine] Could not resolve the Supine variant assets. Check guids.json.");
+                Debug.LogError("[VRCSupine] Could not resolve the Supine template assets. Check guids.json.");
                 CanCombine = false;
             }
         }
@@ -64,7 +63,7 @@ namespace Supine
         /// <param name="options">SupineCombineOptions 組込オプション</param>
         public SupineCheckResult Validate(SupineCombineOptions options)
         {
-            return new SupineCombineValidator(_avatarDescriptor, _variant).Validate(options);
+            return new SupineCombineValidator(_avatarDescriptor).Validate(options);
         }
 
         /// <summary>
@@ -118,7 +117,7 @@ namespace Supine
             List<GameObject> oldPrefabs = FindPlacedSupinePrefabs();
 
             // MA Prefabを設置＆編集したLocomotionを差す
-            string maPrefabPath = AssetDatabase.GUIDToAssetPath(_variant.prefab);
+            string maPrefabPath = AssetDatabase.GUIDToAssetPath(_template.prefab);
             GameObject maPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(maPrefabPath);
             GameObject maPrefabInstance = PrefabUtility.InstantiatePrefab(maPrefab, _avatar.transform) as GameObject;
             Undo.RegisterCreatedObjectUndo(maPrefabInstance, "Create Supine MA Prefab");
@@ -172,7 +171,7 @@ namespace Supine
         /// </summary>
         private AnimatorController BuildStandardLocomotion(SupineCombineOptions options)
         {
-            AnimatorController supineLocomotion = CopyAssetFromGuid<AnimatorController>(_variant.controller);
+            AnimatorController supineLocomotion = CopyAssetFromGuid<AnimatorController>(_template.controller);
 
             if (options.ShouldInherit)
             {
@@ -207,7 +206,7 @@ namespace Supine
                     "Using the VRChat default locomotion as the target.");
             }
 
-            AnimatorController template = _variant.LoadController();
+            AnimatorController template = _template.LoadController();
             if (template == null)
             {
                 Debug.LogError("[VRCSupine] Could not load the Supine template controller.");
@@ -433,14 +432,13 @@ namespace Supine
                 return;
             }
 
-            // 座りアニメーションはバリアント共通のため、ごろ寝システム本体の guids.json から引く
             string guid = SittingPoseTable.GetAnimationGuid(pose, JsonHelper.GetGuidList().animations.sitting);
             state.motion = AssetDatabase.LoadAssetAtPath<AnimationClip>(AssetDatabase.GUIDToAssetPath(guid));
         }
 
         /// <summary>
         /// アバター直下から設置済みのごろ寝システムMA Prefabを探す。
-        /// バリアント名を直接知らなくても、SupineMASlotの有無だけで判定する。
+        /// Prefab名を直接知らなくても、SupineMASlotの有無だけで判定する。
         /// SupineMASlot導入以前に設置された、マーカーの無い残骸も併せて拾う（互換対応）。
         /// </summary>
         private List<GameObject> FindPlacedSupinePrefabs()
@@ -459,7 +457,7 @@ namespace Supine
 
         /// <summary>
         /// 新しいMA Prefabを古いMA Prefabの位置へ移し、古いものを削除する。
-        /// 他バリアント（EX⇔通常版など）の入れ替えも行う。
+        /// 5.0より前のEX版など、古い版のMA Prefabもここで入れ替える。
         /// </summary>
         /// <param name="newPrefab">新しいMA Prefab</param>
         /// <param name="oldPrefabs">設置済みだったMA Prefab</param>

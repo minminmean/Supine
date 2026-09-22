@@ -16,12 +16,12 @@ namespace Supine
     internal sealed class SupineCombineValidator
     {
         private readonly VRCAvatarDescriptor _avatarDescriptor;
-        private readonly SupineVariant _variant;
+        private readonly SupineTemplate _template;
 
-        public SupineCombineValidator(VRCAvatarDescriptor avatarDescriptor, SupineVariant variant)
+        public SupineCombineValidator(VRCAvatarDescriptor avatarDescriptor)
         {
             _avatarDescriptor = avatarDescriptor;
-            _variant = variant;
+            _template = JsonHelper.GetGuidList().template;
         }
 
         /// <summary>
@@ -37,16 +37,16 @@ namespace Supine
                 return result;
             }
 
-            if (!_variant.IsValid)
+            if (!_template.IsValid)
             {
-                result.Failure = SupineCombineFailure.InvalidVariant;
+                result.Failure = SupineCombineFailure.MissingTemplate;
                 return result;
             }
 
-            AnimatorController template = _variant.LoadController();
+            AnimatorController template = _template.LoadController();
             if (template == null || template.layers.Length == 0 || template.layers[0].stateMachine == null)
             {
-                result.Failure = SupineCombineFailure.InvalidVariant;
+                result.Failure = SupineCombineFailure.MissingTemplate;
                 return result;
             }
 

@@ -43,7 +43,7 @@
     "check_successful_warning_message": "Check is successful, but there are warnings.\nPlease check the console log before clicking Create button.",
     "check_failure": "Check failure",
     "check_failure_message": "Cannot combine.\nThis is not avatar object.",
-    "check_failure_variant_message": "Could not resolve the Supine assets.\nThe package may be broken.",
+    "check_failure_template_message": "Could not resolve the Supine assets.\nThe package may be broken.",
     "check_failure_add_target_message": "Could not find the target animator.\nPlease specify the target animator manually.",
     "check_failure_add_layer_message": "The target animator has no layers.\nPlease specify another animator.",
     "check_failure_add_entry_message": "No entry state is selected.\nPlease choose the state that Supine enters from.",
