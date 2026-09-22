@@ -53,6 +53,16 @@ namespace Supine.Utilities
             return guids;
         }
 
+        /// <summary>
+        /// EX 4.x の組込ウィンドウがコンパイルを通すためだけの口。何も読まずに既定値を返す。
+        /// 詳しくは <see cref="SupineCombinerWindowBase"/>。
+        /// </summary>
+        [Obsolete(SupineLegacyEx.UpdateMessage)]
+        public static LegacyGuidDictionary GetGuidList(string guidsJsonGuid)
+        {
+            return default;
+        }
+
         public static LocalizeDictionary GetLocalizedTexts(SupineLanguage language)
         {
             if (LocalizeCache.TryGetValue(language, out LocalizeDictionary cached)) return cached;
