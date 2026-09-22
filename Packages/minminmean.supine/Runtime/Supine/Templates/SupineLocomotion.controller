@@ -1346,7 +1346,7 @@ AnimatorState:
   m_SpeedParameter: 
   m_MirrorParameter: 
   m_CycleOffsetParameter: 
-  m_TimeParameter: VRCSupineExAdjust
+  m_TimeParameter: VRCSupinePoseAdjust
 --- !u!1101 &-6423272293652116035
 AnimatorStateTransition:
   m_ObjectHideFlags: 1
@@ -1754,7 +1754,7 @@ AnimatorState:
   m_SpeedParameter: 
   m_MirrorParameter: 
   m_CycleOffsetParameter: 
-  m_TimeParameter: VRCSupineExAdjust
+  m_TimeParameter: VRCSupinePoseAdjust
 --- !u!1101 &-5573497929540825686
 AnimatorStateTransition:
   m_ObjectHideFlags: 1
@@ -2105,7 +2105,7 @@ AnimatorStateTransition:
   m_Name: 
   m_Conditions:
   - m_ConditionMode: 2
-    m_ConditionEvent: VRCSupineExAdjusting
+    m_ConditionEvent: VRCSupinePoseAdjusting
     m_EventTreshold: 0
   - m_ConditionMode: 7
     m_ConditionEvent: VRCSupine
@@ -4136,7 +4136,7 @@ AnimatorState:
   m_SpeedParameter: 
   m_MirrorParameter: 
   m_CycleOffsetParameter: 
-  m_TimeParameter: VRCSupineExAdjust
+  m_TimeParameter: VRCSupinePoseAdjust
 --- !u!1101 &-191557454782492045
 AnimatorStateTransition:
   m_ObjectHideFlags: 1
@@ -4519,13 +4519,13 @@ AnimatorController:
     m_DefaultInt: 0
     m_DefaultBool: 0
     m_Controller: {fileID: 9100000}
-  - m_Name: VRCSupineExAdjust
+  - m_Name: VRCSupinePoseAdjust
     m_Type: 1
     m_DefaultFloat: 0
     m_DefaultInt: 0
     m_DefaultBool: 0
     m_Controller: {fileID: 9100000}
-  - m_Name: VRCSupineExAdjusting
+  - m_Name: VRCSupinePoseAdjusting
     m_Type: 4
     m_DefaultFloat: 0
     m_DefaultInt: 0
@@ -8894,7 +8894,7 @@ AnimatorState:
   m_SpeedParameter: VelocityX
   m_MirrorParameter: 
   m_CycleOffsetParameter: 
-  m_TimeParameter: VRCSupineExAdjust
+  m_TimeParameter: VRCSupinePoseAdjust
 --- !u!1101 &501095839174459173
 AnimatorStateTransition:
   m_ObjectHideFlags: 1
@@ -8904,7 +8904,7 @@ AnimatorStateTransition:
   m_Name: 
   m_Conditions:
   - m_ConditionMode: 2
-    m_ConditionEvent: VRCSupineExAdjusting
+    m_ConditionEvent: VRCSupinePoseAdjusting
     m_EventTreshold: 0
   - m_ConditionMode: 6
     m_ConditionEvent: VRCSupine
@@ -9024,7 +9024,7 @@ AnimatorState:
   m_SpeedParameter: 
   m_MirrorParameter: 
   m_CycleOffsetParameter: 
-  m_TimeParameter: VRCSupineExAdjust
+  m_TimeParameter: VRCSupinePoseAdjust
 --- !u!1101 &888580353924985178
 AnimatorStateTransition:
   m_ObjectHideFlags: 1
@@ -14784,7 +14784,7 @@ AnimatorStateTransition:
   m_Name: 
   m_Conditions:
   - m_ConditionMode: 1
-    m_ConditionEvent: VRCSupineExAdjusting
+    m_ConditionEvent: VRCSupinePoseAdjusting
     m_EventTreshold: 0
   m_DstStateMachine: {fileID: 0}
   m_DstState: {fileID: 6513506704191067378}
@@ -15839,7 +15839,7 @@ AnimatorStateTransition:
   m_Name: 
   m_Conditions:
   - m_ConditionMode: 2
-    m_ConditionEvent: VRCSupineExAdjusting
+    m_ConditionEvent: VRCSupinePoseAdjusting
     m_EventTreshold: 0
   - m_ConditionMode: 6
     m_ConditionEvent: VRCSupine
@@ -17182,7 +17182,7 @@ AnimatorState:
   m_SpeedParameter: VelocityX
   m_MirrorParameter: 
   m_CycleOffsetParameter: 
-  m_TimeParameter: VRCSupineExAdjust
+  m_TimeParameter: VRCSupinePoseAdjust
 --- !u!1101 &7839961299897740131
 AnimatorStateTransition:
   m_ObjectHideFlags: 1

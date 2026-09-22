@@ -22,7 +22,7 @@ namespace Supine
     /// テンプレートのレイヤー0は「VRChat既定Locomotion + ごろ寝の追加分」という構造なので、
     /// 既定Locomotionとの差分だけを追加先へ移植すれば、既存のアニメーターを保ったまま合流できる。
     /// 差分の基準を既定Locomotionに置くことで、テンプレート固有のステート名を持たずに済み、
-    /// 通常版とEX版のようにテンプレートが違っても同じロジックが成立する。
+    /// テンプレートのステートを増減しても同じロジックが成立する。
     ///
     /// 注意: 追加されているのはステートだけではない。テンプレートは Standing / Crouching / Prone の
     /// 既存遷移にも条件を足している（例: Crouching→Prone に VRCSupine == 0）。
@@ -449,8 +449,8 @@ namespace Supine
         /// パラメータは既存のレイヤーが参照している可能性があるため触らない
         /// （どのみち同じ名前・型で足し直される）。
         ///
-        /// 落とせるのは自分のテンプレートに在るステート名だけなので、
-        /// EX版で組み込んだものを通常版で組み直すような場合、EX固有のステートは消し残る。
+        /// 落とせるのはテンプレートに在るステート名だけなので、
+        /// 5.0より前のEX版で組み込んだものを組み直すような場合、EX固有のステートは消し残る。
         /// 遷移は切れて到達不能になるだけなので、警告で伝えるに留めている
         /// （テンプレートに無い名前まで落とすと、ユーザーが足したステートまで巻き込む）。
         ///
@@ -466,7 +466,7 @@ namespace Supine
             _report.Warnings.Add(
                 "The target animator already contained Supine. " +
                 "Removed the previous Supine states and layers before adding it again. " +
-                "States this variant does not know about are left behind unused.");
+                "States the current template does not know about are left behind unused.");
         }
 
         private void RemoveSupineLayers()

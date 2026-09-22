@@ -43,7 +43,7 @@
     "check_successful_warning_message": "検証に成功しましたが、警告があります。\nコンソールログを確認してから生成ボタンを押してください。",
     "check_failure": "検証失敗",
     "check_failure_message": "ごろ寝システムを組込できません。\nアバターではありません。",
-    "check_failure_variant_message": "ごろ寝システムのアセットを解決できません。\nパッケージが壊れている可能性があります。",
+    "check_failure_template_message": "ごろ寝システムのアセットを解決できません。\nパッケージが壊れている可能性があります。",
     "check_failure_add_target_message": "追加先のアニメーターが見つかりません。\n追加先アニメーターを手動で指定してください。",
     "check_failure_add_layer_message": "追加先のアニメーターにレイヤーがありません。\n別のアニメーターを指定してください。",
     "check_failure_add_entry_message": "入口ステートが指定されていません。\nごろ寝システムへ入る起点にするステートを選択してください。",

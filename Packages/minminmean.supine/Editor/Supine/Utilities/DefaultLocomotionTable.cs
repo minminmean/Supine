@@ -11,7 +11,7 @@ namespace Supine.Utilities
     /// テンプレートのどのステートが「ごろ寝システムが足した分」なのかを、
     /// 既定Locomotionとの差分で判定するために使う。
     /// テンプレート側のステート名をハードコードしないので、
-    /// 通常版とEX版のようにテンプレートが違っても同じ判定が成立する。
+    /// テンプレートのステートを増減しても同じ判定が成立する。
     /// </summary>
     internal static class DefaultLocomotionTable
     {

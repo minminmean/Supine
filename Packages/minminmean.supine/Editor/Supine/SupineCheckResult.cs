@@ -12,7 +12,7 @@ namespace Supine
         NoAvatarDescriptor,
 
         /// <summary>guids.jsonが読めていない、または内容が欠けている</summary>
-        InvalidVariant,
+        MissingTemplate,
 
         /// <summary>追加先のアニメーターを解決できない</summary>
         AddTargetNotFound,
@@ -41,7 +41,7 @@ namespace Supine
             switch (failure)
             {
                 case SupineCombineFailure.NoAvatarDescriptor:   return dict.check_failure_message;
-                case SupineCombineFailure.InvalidVariant:       return dict.check_failure_variant_message;
+                case SupineCombineFailure.MissingTemplate:       return dict.check_failure_template_message;
                 case SupineCombineFailure.AddTargetNotFound:  return dict.check_failure_add_target_message;
                 case SupineCombineFailure.AddTargetNoLayer:   return dict.check_failure_add_layer_message;
                 case SupineCombineFailure.AddEntryStateNotSelected: return dict.check_failure_add_entry_message;

@@ -37,7 +37,7 @@ namespace Supine
 
         /// <summary>
         /// ポーズのアニメーションクリップ。
-        /// キーを2つ以上持たせると、その間を Ex Adjust（VRCSupineExAdjust）でスクラブできる。
+        /// キーを2つ以上持たせると、その間を Pose Adjust（VRCSupinePoseAdjust）でスクラブできる。
         /// キーが1つでも動作するが、その場合は調整軸を持たないポーズになる。
         /// </summary>
         public AnimationClip clip;

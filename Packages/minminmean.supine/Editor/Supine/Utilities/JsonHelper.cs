@@ -19,36 +19,23 @@ namespace Supine.Utilities
                 "en.json"
             };
 
-        // バリアントごとに別のJSONを読むため、GUIDをキーにしてキャッシュする。
-        // 単一フィールドでキャッシュすると通常版とEX版で参照先が混線する。
-        private static readonly Dictionary<string, GuidDictionary> GuidCache =
-            new Dictionary<string, GuidDictionary>();
+        private static GuidDictionary? _guidCache;
         private static readonly Dictionary<SupineLanguage, LocalizeDictionary> LocalizeCache =
             new Dictionary<SupineLanguage, LocalizeDictionary>();
 
         /// <summary>
-        /// ごろ寝システム本体の guids.json を読む
+        /// guids.json を読む。
+        /// 読めなかった場合は既定値を返す（呼び出し側が SupineTemplate.IsValid で判定する）。
         /// </summary>
         public static GuidDictionary GetGuidList()
         {
-            return GetGuidList(SupineGuidsJsonGuid);
-        }
-
-        /// <summary>
-        /// GUIDを指定して guids.json を読む。
-        /// EX版など別パッケージが自分のバリアント定義を読むために使う。
-        /// 読めなかった場合は既定値を返す（呼び出し側が SupineVariant.IsValid で判定する）。
-        /// </summary>
-        /// <param name="guidsJsonGuid">guids.json のGUID</param>
-        public static GuidDictionary GetGuidList(string guidsJsonGuid)
-        {
-            if (GuidCache.TryGetValue(guidsJsonGuid, out GuidDictionary cached)) return cached;
+            if (_guidCache.HasValue) return _guidCache.Value;
 
             GuidDictionary guids = default;
-            string path = AssetDatabase.GUIDToAssetPath(guidsJsonGuid);
+            string path = AssetDatabase.GUIDToAssetPath(SupineGuidsJsonGuid);
             if (string.IsNullOrEmpty(path))
             {
-                Debug.LogError("[VRCSupine] Could not find guids.json for GUID: (" + guidsJsonGuid + ")");
+                Debug.LogError("[VRCSupine] Could not find guids.json for GUID: (" + SupineGuidsJsonGuid + ")");
             }
             else
             {
@@ -62,7 +49,7 @@ namespace Supine.Utilities
                 }
             }
 
-            GuidCache[guidsJsonGuid] = guids;
+            _guidCache = guids;
             return guids;
         }
 
