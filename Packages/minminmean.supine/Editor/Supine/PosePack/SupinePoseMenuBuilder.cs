@@ -17,16 +17,16 @@ namespace Supine.PosePack
     /// 共通の1枚へ全部まとめると、VRChatの上限8項目をすぐ超えて「Next」で
     /// ページを送ることになり、目的のポーズに辿り着くまでの手数が増える。
     ///
-    /// ポーズ以外の項目は Misc にまとめてあるので、トップレベルにはポーズの
-    /// メニューだけが並ぶ。Misc は常に末尾へ送り直す。
+    /// パックのメニューは Supine Poses の直後に並べ、Crouch Poses・Misc・Foot Anchor は
+    /// 常にその後ろへ送り直す。
     /// </summary>
     internal static class SupinePoseMenuBuilder
     {
         /// <summary>パックのサブメニューを並べる先</summary>
         private const string RootMenuName = "Suimin";
 
-        /// <summary>ポーズ以外をまとめた項目。常に末尾に置く</summary>
-        private const string MiscMenuName = "Misc";
+        /// <summary>パックのメニューより後ろに置く項目。この順で末尾に並べる</summary>
+        private static readonly string[] TrailingMenuNames = { "Crouch Poses", "Misc", "Foot Anchor" };
 
         /// <summary>VRChatの1メニューあたりの項目数上限</summary>
         private const int MenuCapacity = 8;
@@ -99,9 +99,13 @@ namespace Supine.PosePack
                     submenu, folders[folder], adjustFolders.Contains(folder), icon, footAnchor, warnings);
             }
 
-            // パックを足したぶん Misc が押し出されるので、末尾へ送り直す
-            Transform misc = FindChild(posesRoot, MiscMenuName);
-            if (misc != null) misc.SetAsLastSibling();
+            // パックのメニューは末尾に生えるので、後ろに置く項目を順に末尾へ送り直す。
+            // 結果は「Supine Poses / 各パック / Crouch Poses / Misc / Foot Anchor」になる
+            foreach (string name in TrailingMenuNames)
+            {
+                Transform trailing = FindChild(posesRoot, name);
+                if (trailing != null) trailing.SetAsLastSibling();
+            }
 
             WarnIfOverCapacity(posesRoot, warnings);
         }
