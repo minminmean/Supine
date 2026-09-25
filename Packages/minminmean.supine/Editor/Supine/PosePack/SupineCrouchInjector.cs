@@ -2,16 +2,24 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.Animations;
-using VRC.SDK3.Avatars.Components;
 using Supine.Utilities;
-using ModularAvatarMenuItem = nadena.dev.modular_avatar.core.ModularAvatarMenuItem;
-using ModularAvatarParameters = nadena.dev.modular_avatar.core.ModularAvatarParameters;
-using ParameterConfig = nadena.dev.modular_avatar.core.ParameterConfig;
 
 namespace Supine.PosePack
 {
     /// <summary>
-    /// しゃがみポーズの切り替えを組み込む。
+    /// しゃがみポーズを組み込んだ結果。メニュー側はこれを見て項目と既定の印を作る。
+    /// </summary>
+    internal sealed class SupineCrouchInjection
+    {
+        /// <summary>ツリーへ実際に枝を足せたパックのしゃがみ</summary>
+        public List<ResolvedCrouchPose> PackPoses;
+
+        /// <summary>CrouchPose の既定値。ツリーの閾値から引いたもの</summary>
+        public float DefaultValue;
+    }
+
+    /// <summary>
+    /// しゃがみポーズの切り替えをコントローラへ組み込む。
     ///
     /// しゃがみは全ポーズの出入り口になっているハブで、入ってくる遷移だけで13本ある。
     /// ポーズごとにステートを作ると、その配線が丸ごとポーズ数ぶん増えてしまう。
@@ -26,34 +34,28 @@ namespace Supine.PosePack
     ///
     /// メニュー項目と CrouchPose の同期パラメータ登録は SupineMA Prefab が、
     /// コントローラ側の CrouchPose はテンプレートのコントローラが持っている。
-    /// ここが面倒を見るのは、モーションの差し替えと既定値の反映、
-    /// そして「既存を優先」したときの後片付けだけ。
+    /// ここが面倒を見るのは、モーションの差し替えとコントローラ側の既定値だけ。
+    /// Prefab 側は <see cref="SupineCrouchMenuBuilder"/> が受け持つ。
     /// </summary>
     internal static class SupineCrouchInjector
     {
         private const string CrouchPoseParameter = SupineNames.Parameters.CrouchPose;
         private const string CrouchingStateName = SupineNames.States.Crouching;
-        private const string CrouchMenuName = SupineNames.Menus.CrouchPoses;
 
-        public static void Inject(
+        /// <summary>
+        /// しゃがみのモーションを差し替え、CrouchPose の既定値を反映する。
+        /// 既存のしゃがみ切り替えを優先する場合は呼ばないこと。
+        /// </summary>
+        /// <returns>組み込めなかったら null。コントローラには何も残さない</returns>
+        public static SupineCrouchInjection Inject(
             AnimatorController controller,
-            GameObject maPrefabInstance,
             IReadOnlyList<SupinePosePack> packs,
             StateNameMap stateNames,
             SupineCombineOptions options,
             List<string> warnings)
         {
-            if (options.keepExistingCrouchPose)
-            {
-                // 既存の切り替えを活かすなら、こちらのメニューもパラメータも要らない。
-                // 残すと「押しても何も起きない項目」が並び、同期枠も8bit無駄になる
-                RemoveMenu(maPrefabInstance);
-                RemoveParameter(maPrefabInstance);
-                return;
-            }
-
             BlendTree template = LoadTemplateTree();
-            if (template == null) return;
+            if (template == null) return null;
 
             AnimatorState crouching =
                 AnimatorStateUtility.FindState(controller, stateNames.Resolve(CrouchingStateName))?.State;
@@ -62,67 +64,25 @@ namespace Supine.PosePack
                 warnings.Add(
                     "Could not find the crouching state in the generated controller. " +
                     "Crouch poses were not applied.");
-                return;
+                return null;
             }
 
             // パックが足すしゃがみ。1つも無ければ従来どおりテンプレートの7種だけになる
             List<ResolvedCrouchPose> packPoses =
                 SupinePosePackRegistry.ResolveCrouch(packs, template, warnings);
 
-            BlendTree root = BuildRootTree(template, crouching.motion, controller, packPoses, warnings);
-            if (root == null) return;
+            BlendTree root = BuildRootTree(
+                template, crouching.motion, controller, packPoses, warnings, out List<ResolvedCrouchPose> added);
+            if (root == null) return null;
 
             crouching.motion = root;
-            SupineCrouchMenuBuilder.Build(maPrefabInstance, packPoses, warnings);
-            ApplyDefaultPose(controller, maPrefabInstance, root, options, packPoses);
-        }
 
-        /// <summary>
-        /// 既存のしゃがみモーションが入れ子のブレンドツリーかどうかを調べる。
-        ///
-        /// 入れ子になっているなら、別のポーズツールが同じ手法でしゃがみを
-        /// 差し替えている可能性が高い。そのまま組み込むと相手の切り替えを乗っ取るため、
-        /// 検出できたときだけ利用者に選ばせる。
-        /// </summary>
-        /// <returns>入れ子のツリー。該当しなければ null</returns>
-        public static BlendTree FindExistingNestedTree(
-            VRCAvatarDescriptor avatar, SupineCombineOptions options)
-        {
-            if (avatar == null) return null;
+            // 値はツリーの閾値から引く。数値を別に持つと、ツリーの並びを変えたときに
+            // 黙ってずれて「起動時だけ違うポーズ」という気付きにくい不具合になる
+            float defaultValue = ResolveDefaultValue(root, options, added);
+            AnimatorParameterUtility.SetDefaultFloat(controller, CrouchPoseParameter, defaultValue);
 
-            AnimatorController source;
-            string stateName;
-
-            if (options.mode == SupineCombineMode.Add)
-            {
-                source = BaseAnimatorResolver.Resolve(avatar, options.EffectiveAddTargetOverride).controller;
-                stateName = string.IsNullOrEmpty(options.entryStateName)
-                    ? CrouchingStateName
-                    : options.entryStateName;
-            }
-            else
-            {
-                // 継承しないなら元のモーションは生成物に持ち込まれないので、衝突しない
-                if (!options.ShouldInherit) return null;
-                if (!InheritedStateTable.TryResolveSourceStateName(
-                        options, CrouchingStateName, out stateName)) return null;
-
-                source = BaseAnimatorResolver.FindBaseLayerController(avatar);
-            }
-
-            if (source == null) return null;
-
-            AnimatorState state = AnimatorStateUtility.FindState(source, stateName)?.State;
-            if (state == null) return null;
-
-            BlendTree tree = state.motion as BlendTree;
-            if (tree == null) return null;
-
-            foreach (ChildMotion child in tree.children)
-            {
-                if (child.motion is BlendTree) return tree;
-            }
-            return null;
+            return new SupineCrouchInjection { PackPoses = added, DefaultValue = defaultValue };
         }
 
         private static BlendTree LoadTemplateTree()
@@ -144,10 +104,14 @@ namespace Supine.PosePack
         /// 毎回作り直して、先頭の子だけ「元のモーション」に差し替える。
         /// こうすると Default は常に「そのアバターが元々そうだった姿」を意味する。
         /// </summary>
+        /// <param name="added">枝を足せたパックのしゃがみ。メニューにはこれだけを出す</param>
         private static BlendTree BuildRootTree(
             BlendTree template, Motion originalMotion, AnimatorController controller,
-            IReadOnlyList<ResolvedCrouchPose> packPoses, List<string> warnings)
+            IReadOnlyList<ResolvedCrouchPose> packPoses, List<string> warnings,
+            out List<ResolvedCrouchPose> added)
         {
+            added = new List<ResolvedCrouchPose>();
+
             if (template.children.Length == 0)
             {
                 warnings.Add("The crouch pose blend tree has no children. Crouch poses were not applied.");
@@ -192,6 +156,7 @@ namespace Supine.PosePack
                     position = Vector2.zero,
                     directBlendParameter = string.Empty,
                 });
+                added.Add(pose);
             }
 
             root.children = all.ToArray();
@@ -258,23 +223,6 @@ namespace Supine.PosePack
             return variant;
         }
 
-        /// <summary>
-        /// 選ばれたしゃがみポーズを既定値として反映する。
-        ///
-        /// 値はツリーの閾値から引く。数値を別に持つと、ツリーの並びを変えたときに
-        /// 黙ってずれて「起動時だけ違うポーズ」という気付きにくい不具合になる。
-        /// </summary>
-        private static void ApplyDefaultPose(
-            AnimatorController controller, GameObject maPrefabInstance, BlendTree root,
-            SupineCombineOptions options, IReadOnlyList<ResolvedCrouchPose> packPoses)
-        {
-            float value = ResolveDefaultValue(root, options, packPoses);
-
-            AnimatorParameterUtility.SetDefaultFloat(controller, CrouchPoseParameter, value);
-            SetMenuParameterDefault(maPrefabInstance, value);
-            MarkDefaultMenuItem(maPrefabInstance, value);
-        }
-
         private static float ResolveDefaultValue(
             BlendTree root, SupineCombineOptions options, IReadOnlyList<ResolvedCrouchPose> packPoses)
         {
@@ -293,77 +241,6 @@ namespace Supine.PosePack
             if (index < 0 || index >= root.children.Length) index = 0;
 
             return root.children[index].threshold;
-        }
-
-        private static void SetMenuParameterDefault(GameObject maPrefabInstance, float value)
-        {
-            ModularAvatarParameters parameters = FindParameters(maPrefabInstance);
-            if (parameters == null) return;
-
-            for (int i = 0; i < parameters.parameters.Count; i++)
-            {
-                if (parameters.parameters[i].nameOrPrefix != CrouchPoseParameter) continue;
-
-                ParameterConfig config = parameters.parameters[i];
-                config.defaultValue = value;
-                config.hasExplicitDefaultValue = true;
-                parameters.parameters[i] = config;
-
-                EditorUtility.SetDirty(parameters);
-                return;
-            }
-        }
-
-        /// <summary>
-        /// メニュー上でも既定のポーズに印を移す。
-        ///
-        /// 並びの何番目かではなく、項目が書き込む値で合わせる。
-        /// 項目が増えてページ送りが出ると、番号と枠番号は一致しなくなる。
-        /// </summary>
-        private static void MarkDefaultMenuItem(GameObject maPrefabInstance, float value)
-        {
-            Transform menu = MenuItemUtility.FindDescendant(maPrefabInstance.transform, CrouchMenuName);
-            if (menu == null) return;
-
-            foreach (ModularAvatarMenuItem item in menu.GetComponentsInChildren<ModularAvatarMenuItem>(true))
-            {
-                if (item.Control == null) continue;
-                if (item.Control.parameter == null) continue;
-                if (item.Control.parameter.name != CrouchPoseParameter) continue;
-
-                item.isDefault = SupineCrouchValues.Approximately(item.Control.value, value);
-                EditorUtility.SetDirty(item);
-            }
-        }
-
-        private static void RemoveMenu(GameObject maPrefabInstance)
-        {
-            Transform menu = MenuItemUtility.FindDescendant(maPrefabInstance.transform, CrouchMenuName);
-            if (menu == null) return;
-
-            Undo.DestroyObjectImmediate(menu.gameObject);
-        }
-
-        private static void RemoveParameter(GameObject maPrefabInstance)
-        {
-            ModularAvatarParameters parameters = FindParameters(maPrefabInstance);
-            if (parameters == null) return;
-
-            for (int i = parameters.parameters.Count - 1; i >= 0; i--)
-            {
-                if (parameters.parameters[i].nameOrPrefix != CrouchPoseParameter) continue;
-
-                Undo.RecordObject(parameters, "Remove Crouch Pose Parameter");
-                parameters.parameters.RemoveAt(i);
-                EditorUtility.SetDirty(parameters);
-            }
-        }
-
-        private static ModularAvatarParameters FindParameters(GameObject maPrefabInstance)
-        {
-            return maPrefabInstance == null
-                ? null
-                : maPrefabInstance.GetComponentInChildren<ModularAvatarParameters>(true);
         }
     }
 }

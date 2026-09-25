@@ -102,6 +102,7 @@ namespace Supine
             {
                 ToggleJumpMotion(supineLocomotion, !options.disableJumpMotion, options.enableJumpAtDesktop);
             }
+
             // ここから先は生成物のステートを名前で引くので、実名への対応表を1つだけ作って回す
             StateNameMap stateNames = new StateNameMap(options, renamedStates);
 
@@ -114,9 +115,18 @@ namespace Supine
             List<PosePack.ResolvedPose> injectedPoses = InjectPosePacks(
                 supineLocomotion, packs, stateNames, posePackWarnings);
 
+            // しゃがみポーズの切り替えを組み込む。ポーズとは別の軸なので、パックが1つも無くても効く。
+            // 既存の切り替えを活かすなら、コントローラには手を入れない
+            PosePack.SupineCrouchInjection crouch = options.keepExistingCrouchPose
+                ? null
+                : PosePack.SupineCrouchInjector.Inject(
+                    supineLocomotion, packs, stateNames, options, posePackWarnings);
+
+            // コントローラへの変更はここまで。しゃがみの根ツリーも子アセットとして抱かせ終えている
             EditorUtility.SetDirty(supineLocomotion);
             AssetDatabase.SaveAssets();
 
+            // ここからはシーン上のMA Prefabだけを触る。
             // 設置済みのごろ寝システムMA Prefabを、新しいものを置く前に集めておく
             List<GameObject> oldPrefabs = FindPlacedSupinePrefabs();
 
@@ -139,21 +149,7 @@ namespace Supine
 
             EditorUtility.SetDirty(component);
 
-            // 差し込んだポーズのメニュー項目を生やす。
-            // コントローラ側の採番とここが同じ並びを使うので、値の対応がずれない
-            PosePack.SupinePoseMenuBuilder.Build(maPrefabInstance, injectedPoses, posePackWarnings);
-
-            // しゃがみポーズの切り替えを組み込む。
-            // ポーズとは別の軸なので、パックが1つも無くても効く
-            PosePack.SupineCrouchInjector.Inject(
-                supineLocomotion, maPrefabInstance, packs, stateNames, options, posePackWarnings);
-
-            // 末尾の項目を各ページへ複製するので、しゃがみのメニューが出来上がってから畳む
-            PosePack.SupinePoseMenuBuilder.PaginateRoot(maPrefabInstance, posePackWarnings);
-
-            // 根ツリーをコントローラの子アセットとして抱かせたので、書き出し直す
-            EditorUtility.SetDirty(supineLocomotion);
-            AssetDatabase.SaveAssets();
+            BuildMenus(maPrefabInstance, options, injectedPoses, crouch, posePackWarnings);
 
             foreach (string warning in posePackWarnings)
             {
@@ -170,6 +166,35 @@ namespace Supine
             Undo.CollapseUndoOperations(undoGroup);
 
             Debug.Log("[VRCSupine] MA Prefab creation is done.");
+        }
+
+        /// <summary>
+        /// 設置したMA Prefabのメニューを、コントローラへの組込結果に合わせる。
+        ///
+        /// 順番に意味がある。トップレベルのページ送りは末尾の項目（Crouch Poses など）を
+        /// 各ページへ複製するので、しゃがみのメニューが出来上がってから最後に畳む。
+        /// 先に畳むと、複製にパックのしゃがみが入らず、既存を優先したときも1枚目しか消えない。
+        /// </summary>
+        private static void BuildMenus(
+            GameObject maPrefabInstance,
+            SupineCombineOptions options,
+            List<PosePack.ResolvedPose> injectedPoses,
+            PosePack.SupineCrouchInjection crouch,
+            List<string> warnings)
+        {
+            // コントローラ側の採番とここが同じ並びを使うので、値の対応がずれない
+            PosePack.SupinePoseMenuBuilder.Build(maPrefabInstance, injectedPoses, warnings);
+
+            if (options.keepExistingCrouchPose)
+            {
+                PosePack.SupineCrouchMenuBuilder.Remove(maPrefabInstance);
+            }
+            else if (crouch != null)
+            {
+                PosePack.SupineCrouchMenuBuilder.Build(maPrefabInstance, crouch, warnings);
+            }
+
+            PosePack.SupinePoseMenuBuilder.PaginateRoot(maPrefabInstance, warnings);
         }
 
         /// <summary>

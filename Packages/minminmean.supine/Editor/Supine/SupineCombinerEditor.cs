@@ -312,7 +312,7 @@ namespace Supine
 
             _existingCrouchSignature = signature;
             _existingCrouchTree =
-                PosePack.SupineCrouchInjector.FindExistingNestedTree(avatarDescriptor, _options);
+                PosePack.SupineCrouchConflictDetector.FindExistingNestedTree(avatarDescriptor, _options);
         }
 
         /// <summary>
