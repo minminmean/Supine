@@ -23,23 +23,22 @@ namespace Supine.PosePack
     /// </summary>
     internal static class SupinePoseMenuBuilder
     {
-        /// <summary>パックのサブメニューを並べる先</summary>
-        private const string RootMenuName = "Suimin";
+        private const string RootMenuName = SupineNames.Menus.Root;
 
         /// <summary>パックのメニューより後ろに置く項目。この順で末尾に並べる</summary>
-        private static readonly string[] TrailingMenuNames = { "Crouch Poses", "Misc", "Foot Anchor" };
+        private static readonly string[] TrailingMenuNames =
+            { SupineNames.Menus.CrouchPoses, SupineNames.Menus.Misc, SupineNames.Menus.FootAnchor };
 
         /// <summary>VRChatの1メニューあたりの項目数上限</summary>
         private const int MenuCapacity = 8;
 
-        /// <summary>ページが溢れたときに次ページへ送る項目の名前</summary>
-        private const string NextPageName = "Next";
+        private const string NextPageName = SupineNames.Menus.NextPage;
 
         /// <summary>各パックのメニュー末尾に添える項目。既存のものを複製して使う</summary>
-        private const string FootAnchorName = "Foot Anchor";
+        private const string FootAnchorName = SupineNames.Menus.FootAnchor;
 
         /// <summary>姿勢の微調整を回すラジアル。Foot Anchor の手前に置く</summary>
-        private const string PoseAdjustName = "Pose Adjust";
+        private const string PoseAdjustName = SupineNames.Menus.PoseAdjust;
 
         public static void Build(
             GameObject maPrefabInstance, IReadOnlyList<ResolvedPose> poses, List<string> warnings)
@@ -263,11 +262,11 @@ namespace Supine.PosePack
 
                 // 開いている間だけ立つフラグが本体で、回す軸は subParameters 側
                 parameter = new VRCExpressionsMenu.Control.Parameter
-                    { name = SupinePoseInjector.AdjustingParameter },
+                    { name = SupineNames.Parameters.PoseAdjusting },
                 value = 1f,
                 subParameters = new[]
                 {
-                    new VRCExpressionsMenu.Control.Parameter { name = SupinePoseInjector.AdjustParameter },
+                    new VRCExpressionsMenu.Control.Parameter { name = SupineNames.Parameters.PoseAdjust },
                 },
                 labels = new VRCExpressionsMenu.Control.Label[0],
             };
@@ -329,7 +328,7 @@ namespace Supine.PosePack
                 name = displayName,
                 icon = pose.Entry.icon,
                 type = VRCExpressionsMenu.Control.ControlType.Toggle,
-                parameter = new VRCExpressionsMenu.Control.Parameter { name = SupinePoseInjector.PoseParameter },
+                parameter = new VRCExpressionsMenu.Control.Parameter { name = SupineNames.Parameters.Pose },
                 value = pose.Value,
                 subParameters = new VRCExpressionsMenu.Control.Parameter[0],
                 labels = new VRCExpressionsMenu.Control.Label[0],

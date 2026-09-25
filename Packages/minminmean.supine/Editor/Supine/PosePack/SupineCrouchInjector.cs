@@ -31,9 +31,9 @@ namespace Supine.PosePack
     /// </summary>
     internal static class SupineCrouchInjector
     {
-        private const string CrouchPoseParameter = "CrouchPose";
-        private const string CrouchingStateName = "Crouching";
-        private const string CrouchMenuName = "Crouch Poses";
+        private const string CrouchPoseParameter = SupineNames.Parameters.CrouchPose;
+        private const string CrouchingStateName = SupineNames.States.Crouching;
+        private const string CrouchMenuName = SupineNames.Menus.CrouchPoses;
 
         public static void Inject(
             AnimatorController controller,

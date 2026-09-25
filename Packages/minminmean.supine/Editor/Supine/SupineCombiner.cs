@@ -312,12 +312,12 @@ namespace Supine
             AnimatorControllerParameter[] parameters = supineLocomotion.parameters;
             foreach (AnimatorControllerParameter parameter in parameters)
             {
-                if (parameter.name == "EnableJumpMotion")
+                if (parameter.name == SupineNames.Parameters.EnableJumpMotion)
                 {
                     parameter.defaultBool = enableJump;
                     foundEnableJump = true;
                 }
-                else if (parameter.name == "EnableJumpAtDesktop")
+                else if (parameter.name == SupineNames.Parameters.EnableJumpAtDesktop)
                 {
                     parameter.defaultBool = enableJumpAtDesktop;
                     foundEnableJumpAtDesktop = true;
@@ -413,8 +413,8 @@ namespace Supine
             ChildAnimatorState[] supineLocomotionStates = supineLocomotion.layers[0].stateMachine.states;
 
             // 座りアニメーションを変更
-            SetSittingAnimation(supineLocomotionStates, ResolveStateName("Sit 1", renamedStates), sittingPose1);
-            SetSittingAnimation(supineLocomotionStates, ResolveStateName("Sit 2", renamedStates), sittingPose2);
+            SetSittingAnimation(supineLocomotionStates, ResolveStateName(SupineNames.States.Sit1, renamedStates), sittingPose1);
+            SetSittingAnimation(supineLocomotionStates, ResolveStateName(SupineNames.States.Sit2, renamedStates), sittingPose2);
         }
 
         /// <summary>

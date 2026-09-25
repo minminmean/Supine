@@ -19,13 +19,13 @@ namespace Supine.PosePack
     /// </summary>
     internal static class SupineCrouchMenuBuilder
     {
-        private const string CrouchMenuName = "Crouch Poses";
-        private const string CrouchPoseParameter = "CrouchPose";
+        private const string CrouchMenuName = SupineNames.Menus.CrouchPoses;
+        private const string CrouchPoseParameter = SupineNames.Parameters.CrouchPose;
 
         /// <summary>VRChatのメニュー1ページに入る項目数</summary>
         private const int MenuCapacity = 8;
 
-        private const string NextPageName = "Next";
+        private const string NextPageName = SupineNames.Menus.NextPage;
 
         public static void Build(
             GameObject maPrefabInstance, IReadOnlyList<ResolvedCrouchPose> poses, List<string> warnings)

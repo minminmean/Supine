@@ -39,21 +39,21 @@ namespace Supine
         /// ごろ寝システムの入口として使うステート（テンプレート側の名前）。
         /// ここからVRCSupineの値に応じて各ポーズへ振り分ける。
         /// </summary>
-        internal const string EntryStateName = "Crouching";
+        internal const string EntryStateName = SupineNames.States.Crouching;
 
         /// <summary>
         /// 既定の伏せポーズ（VRCSupine == 0）として扱うステート（テンプレート側の名前）。
         /// </summary>
-        internal const string ProneStateName = "Prone";
+        internal const string ProneStateName = SupineNames.States.Prone;
 
         /// <summary>立ち状態にあたるステート（テンプレート側の名前）。</summary>
-        internal const string StandingStateName = "Standing";
+        internal const string StandingStateName = SupineNames.States.Standing;
 
         /// <summary>
         /// 「しゃがみから伏せへ降りる」遷移の目印になるパラメータ。VRChat標準のUpright。
         /// 入口ステートからこの条件（less than）で降りる先が、そのアニメーターでの伏せ状態にあたる。
         /// </summary>
-        internal const string LieDownConditionParameter = "Upright";
+        internal const string LieDownConditionParameter = SupineNames.Parameters.Upright;
 
         /// <summary>追加したステートを既存のステートに重ねないための余白</summary>
         private const float ClonePositionGap = 300f;
@@ -66,7 +66,7 @@ namespace Supine
         /// この条件を持つテンプレート側の遷移そのものも追加しない。
         /// </summary>
         private static readonly HashSet<string> ExcludedConditionParameters =
-            new HashSet<string> { "EnableJumpMotion" };
+            new HashSet<string> { SupineNames.Parameters.EnableJumpMotion };
 
         private readonly AnimatorController _template;
         private readonly AnimatorController _destination;

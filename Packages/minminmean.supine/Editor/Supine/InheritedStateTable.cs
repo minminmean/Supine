@@ -14,19 +14,19 @@ namespace Supine
         /// <summary>継承先になるテンプレート側のステート名。UIの並び順でもある</summary>
         public static readonly string[] TemplateStateNames =
             {
-                "Standing",
-                "Crouching",
-                "Prone"
+                SupineNames.States.Standing,
+                SupineNames.States.Crouching,
+                SupineNames.States.Prone
             };
 
         public static string GetLabel(string templateStateName, LocalizeDictionary dict)
         {
             switch (templateStateName)
             {
-                case "Standing":  return dict.inherit_standing_state;
-                case "Crouching": return dict.inherit_crouching_state;
-                case "Prone":     return dict.inherit_prone_state;
-                default:          return templateStateName;
+                case SupineNames.States.Standing:  return dict.inherit_standing_state;
+                case SupineNames.States.Crouching: return dict.inherit_crouching_state;
+                case SupineNames.States.Prone:     return dict.inherit_prone_state;
+                default:                           return templateStateName;
             }
         }
 
@@ -35,10 +35,10 @@ namespace Supine
         {
             switch (templateStateName)
             {
-                case "Standing":  return options.inheritStandingStateName;
-                case "Crouching": return options.inheritCrouchingStateName;
-                case "Prone":     return options.inheritProneStateName;
-                default:          return null;
+                case SupineNames.States.Standing:  return options.inheritStandingStateName;
+                case SupineNames.States.Crouching: return options.inheritCrouchingStateName;
+                case SupineNames.States.Prone:     return options.inheritProneStateName;
+                default:                           return null;
             }
         }
 
@@ -47,9 +47,9 @@ namespace Supine
         {
             switch (templateStateName)
             {
-                case "Standing":  options.inheritStandingStateName  = sourceStateName; break;
-                case "Crouching": options.inheritCrouchingStateName = sourceStateName; break;
-                case "Prone":     options.inheritProneStateName     = sourceStateName; break;
+                case SupineNames.States.Standing:  options.inheritStandingStateName  = sourceStateName; break;
+                case SupineNames.States.Crouching: options.inheritCrouchingStateName = sourceStateName; break;
+                case SupineNames.States.Prone:     options.inheritProneStateName     = sourceStateName; break;
             }
         }
 

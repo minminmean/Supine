@@ -354,7 +354,7 @@ namespace Supine.PosePack
 
             foreach (AnimatorCondition condition in transition.conditions)
             {
-                if (condition.parameter != SupinePoseInjector.PoseParameter) continue;
+                if (condition.parameter != SupineNames.Parameters.Pose) continue;
                 if (condition.mode != AnimatorConditionMode.Equals &&
                     condition.mode != AnimatorConditionMode.NotEqual) continue;
 

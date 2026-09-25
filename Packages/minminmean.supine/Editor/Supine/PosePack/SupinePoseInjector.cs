@@ -18,19 +18,15 @@ namespace Supine.PosePack
     /// </summary>
     internal sealed class SupinePoseInjector
     {
-        public const string PoseParameter = "VRCSupine";
-
-        /// <summary>クリップのキーの間をスクラブする軸。メニュー側もこれを回す</summary>
-        public const string AdjustParameter = "VRCSupinePoseAdjust";
-
-        /// <summary>調整中であることを示すフラグ。ラジアルを開いている間だけ立つ</summary>
-        public const string AdjustingParameter = "VRCSupinePoseAdjusting";
-        private const string UprightParameter = "Upright";
+        private const string PoseParameter = SupineNames.Parameters.Pose;
+        private const string AdjustParameter = SupineNames.Parameters.PoseAdjust;
+        private const string AdjustingParameter = SupineNames.Parameters.PoseAdjusting;
+        private const string UprightParameter = SupineNames.Parameters.Upright;
         private const string LockPoseParameter = "VRCLockPose";
         private const string PoseChangedParameter = "PoseChanged";
         private const string CurrentPoseParameter = "CurrentPose";
 
-        private const string CrouchingStateName = "Crouching";
+        private const string CrouchingStateName = SupineNames.States.Crouching;
         private const string PoseChangeStateName = "Pose Change";
         private const string PrepareSupineStateName = "Prepare Supine";
         private const string PrepareAnimationStateName = "Prepare Animation";
