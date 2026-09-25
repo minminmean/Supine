@@ -328,7 +328,7 @@ namespace Supine.PosePack
         /// </summary>
         private static void MarkDefaultMenuItem(GameObject maPrefabInstance, float value)
         {
-            Transform menu = FindDescendant(maPrefabInstance.transform, CrouchMenuName);
+            Transform menu = MenuItemUtility.FindDescendant(maPrefabInstance.transform, CrouchMenuName);
             if (menu == null) return;
 
             foreach (ModularAvatarMenuItem item in menu.GetComponentsInChildren<ModularAvatarMenuItem>(true))
@@ -344,7 +344,7 @@ namespace Supine.PosePack
 
         private static void RemoveMenu(GameObject maPrefabInstance)
         {
-            Transform menu = FindDescendant(maPrefabInstance.transform, CrouchMenuName);
+            Transform menu = MenuItemUtility.FindDescendant(maPrefabInstance.transform, CrouchMenuName);
             if (menu == null) return;
 
             Undo.DestroyObjectImmediate(menu.gameObject);
@@ -388,18 +388,6 @@ namespace Supine.PosePack
                 {
                     if (state.name == name) return state;
                 }
-            }
-            return null;
-        }
-
-        private static Transform FindDescendant(Transform root, string name)
-        {
-            foreach (Transform child in root)
-            {
-                if (child.name == name) return child;
-
-                Transform found = FindDescendant(child, name);
-                if (found != null) return found;
             }
             return null;
         }

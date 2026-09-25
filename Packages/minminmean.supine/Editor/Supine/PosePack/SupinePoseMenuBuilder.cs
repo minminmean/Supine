@@ -1,9 +1,10 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using VRC.SDK3.Avatars.ScriptableObjects;
+using Supine.Utilities;
 using ModularAvatarMenuItem = nadena.dev.modular_avatar.core.ModularAvatarMenuItem;
-using SubmenuSource = nadena.dev.modular_avatar.core.SubmenuSource;
 
 namespace Supine.PosePack
 {
@@ -29,11 +30,6 @@ namespace Supine.PosePack
         private static readonly string[] TrailingMenuNames =
             { SupineNames.Menus.CrouchPoses, SupineNames.Menus.Misc, SupineNames.Menus.FootAnchor };
 
-        /// <summary>VRChatの1メニューあたりの項目数上限</summary>
-        private const int MenuCapacity = 8;
-
-        private const string NextPageName = SupineNames.Menus.NextPage;
-
         /// <summary>各パックのメニュー末尾に添える項目。既存のものを複製して使う</summary>
         private const string FootAnchorName = SupineNames.Menus.FootAnchor;
 
@@ -45,7 +41,7 @@ namespace Supine.PosePack
         {
             if (poses == null || poses.Count == 0) return;
 
-            Transform posesRoot = FindDescendant(maPrefabInstance.transform, RootMenuName);
+            Transform posesRoot = MenuItemUtility.FindDescendant(maPrefabInstance.transform, RootMenuName);
             if (posesRoot == null)
             {
                 warnings.Add(
@@ -82,7 +78,7 @@ namespace Supine.PosePack
             }
 
             // 雛形は自分で作った複製を拾わないよう、1つも生やす前に確保しておく
-            GameObject footAnchor = FindDescendantObject(maPrefabInstance.transform, FootAnchorName);
+            Transform footAnchor = MenuItemUtility.FindDescendant(maPrefabInstance.transform, FootAnchorName);
             if (footAnchor == null)
             {
                 warnings.Add(
@@ -94,16 +90,18 @@ namespace Supine.PosePack
             {
                 folderIcons.TryGetValue(folder, out Texture2D icon);
 
-                Transform submenu = FindChild(posesRoot, folder) ?? CreateSubMenu(posesRoot, folder, icon);
+                Transform submenu = MenuItemUtility.FindChild(posesRoot, folder) ??
+                                    MenuItemUtility.CreateSubMenu(posesRoot, folder, icon);
                 FillPages(
-                    submenu, folders[folder], adjustFolders.Contains(folder), icon, footAnchor, warnings);
+                    submenu, folders[folder], adjustFolders.Contains(folder), icon,
+                    footAnchor != null ? footAnchor.gameObject : null, warnings);
             }
 
             // パックのメニューは末尾に生えるので、後ろに置く項目を順に末尾へ送り直す。
             // 結果は「Supine Poses / 各パック / Crouch Poses / Misc / Foot Anchor」になる
             foreach (string name in TrailingMenuNames)
             {
-                Transform trailing = FindChild(posesRoot, name);
+                Transform trailing = MenuItemUtility.FindChild(posesRoot, name);
                 if (trailing != null) trailing.SetAsLastSibling();
             }
         }
@@ -121,13 +119,13 @@ namespace Supine.PosePack
         /// </summary>
         public static void PaginateRoot(GameObject maPrefabInstance, List<string> warnings)
         {
-            Transform posesRoot = FindDescendant(maPrefabInstance.transform, RootMenuName);
-            if (posesRoot == null || posesRoot.childCount <= MenuCapacity) return;
+            Transform posesRoot = MenuItemUtility.FindDescendant(maPrefabInstance.transform, RootMenuName);
+            if (posesRoot == null || posesRoot.childCount <= MenuItemUtility.MenuCapacity) return;
 
             List<Transform> trailing = new List<Transform>();
             foreach (string name in TrailingMenuNames)
             {
-                Transform item = FindChild(posesRoot, name);
+                Transform item = MenuItemUtility.FindChild(posesRoot, name);
                 if (item != null) trailing.Add(item);
             }
 
@@ -138,49 +136,21 @@ namespace Supine.PosePack
             }
 
             // 末尾の項目と送りを置いたら1枠も残らないなら、ページを送っても進まない
-            if (MenuCapacity - trailing.Count - 1 <= 0)
+            List<int> pages = MenuItemUtility.SplitIntoPages(body.Count, trailing.Count, 0);
+            if (pages == null)
             {
                 WarnIfOverCapacity(posesRoot, warnings);
                 return;
             }
 
-            ModularAvatarMenuItem rootItem = posesRoot.GetComponent<ModularAvatarMenuItem>();
-            Texture2D icon = rootItem != null && rootItem.Control != null ? rootItem.Control.icon : null;
-
-            Transform page = posesRoot;
-            int index = 0;
-
-            while (true)
-            {
-                int capacity = MenuCapacity - trailing.Count;
-                int remaining = body.Count - index;
-
-                // 収まらないなら、送りのぶんもさらに1枠要る
-                bool needsNextPage = remaining > capacity;
-                if (needsNextPage) capacity--;
-
-                int count = Mathf.Min(capacity, remaining);
-
-                // 1ページ目は元から並んでいるので、送った先のページにだけ移す
-                if (page != posesRoot)
+            // 1ページ目には元の末尾の項目が並んでいるので、送った先のページにだけ複製する
+            MenuItemUtility.DistributeToPages(
+                posesRoot, body, pages,
+                page =>
                 {
-                    for (int i = 0; i < count; i++)
-                    {
-                        Undo.SetTransformParent(body[index + i], page, "Create Supine Pose Menu");
-                        body[index + i].SetAsLastSibling();
-                    }
-                    foreach (Transform item in trailing)
-                    {
-                        CopyItem(item.gameObject, page);
-                    }
-                }
-                index += count;
-
-                if (!needsNextPage) return;
-
-                page = CreateSubMenu(page, NextPageName, icon);
-                page.SetAsLastSibling();
-            }
+                    foreach (Transform item in trailing) MenuItemUtility.CopyItem(item.gameObject, page);
+                },
+                MenuItemUtility.GetIcon(posesRoot));
         }
 
         /// <summary>
@@ -202,45 +172,37 @@ namespace Supine.PosePack
         /// 並びは「ポーズ … / Pose Adjust / Foot Anchor / Next」。
         /// </summary>
         private static void FillPages(
-            Transform page, List<ResolvedPose> poses,
+            Transform submenu, List<ResolvedPose> poses,
             bool withAdjust, Texture2D icon, GameObject footAnchor, List<string> warnings)
         {
-            // 末尾に必ず付く項目の数
+            // 末尾に必ず付く項目の数。合流先のサブメニューに元からある項目は動かさない
             int trailing = (withAdjust ? 1 : 0) + (footAnchor != null ? 1 : 0);
-            int index = 0;
-
-            while (true)
+            List<int> pages = MenuItemUtility.SplitIntoPages(poses.Count, trailing, submenu.childCount);
+            if (pages == null)
             {
-                // 末尾に付くぶんを先に引く
-                int capacity = MenuCapacity - page.childCount - trailing;
-                int remaining = poses.Count - index;
-
-                // 収まらないなら、送りのぶんもさらに1枠要る
-                bool needsNextPage = remaining > capacity;
-                if (needsNextPage) capacity--;
-
-                if (capacity <= 0)
-                {
-                    warnings.Add(
-                        "The pose menu '" + page.name + "' is already full. " +
-                        remaining + " pose(s) could not be added.");
-                    return;
-                }
-
-                int count = Mathf.Min(capacity, remaining);
-                for (int i = 0; i < count; i++)
-                {
-                    CreateToggle(page, poses[index + i]);
-                }
-                index += count;
-
-                if (withAdjust) CreatePoseAdjust(page, icon);
-                if (footAnchor != null) CopyItem(footAnchor, page);
-
-                if (index >= poses.Count) return;
-
-                page = CreateSubMenu(page, NextPageName, icon);
+                warnings.Add(
+                    "The pose menu '" + submenu.name + "' is already full. " +
+                    poses.Count + " pose(s) could not be added.");
+                return;
             }
+
+            Action<Transform> addTrailing = page =>
+            {
+                if (withAdjust) CreatePoseAdjust(page, icon);
+                if (footAnchor != null) MenuItemUtility.CopyItem(footAnchor, page);
+            };
+
+            List<Transform> toggles = new List<Transform>();
+            foreach (ResolvedPose pose in poses)
+            {
+                // 既存のポーズ項目と同じく保存しない
+                toggles.Add(MenuItemUtility.CreateToggle(
+                    submenu, pose.Entry.ResolveDisplayName(), pose.Entry.icon,
+                    SupineNames.Parameters.Pose, pose.Value, false));
+            }
+            addTrailing(submenu);
+
+            MenuItemUtility.DistributeToPages(submenu, toggles, pages, addTrailing, icon);
         }
 
         /// <summary>
@@ -249,11 +211,7 @@ namespace Supine.PosePack
         /// </summary>
         private static void CreatePoseAdjust(Transform parent, Texture2D icon)
         {
-            GameObject go = new GameObject(PoseAdjustName);
-            Undo.RegisterCreatedObjectUndo(go, "Create Supine Pose Menu");
-            go.transform.SetParent(parent, false);
-
-            ModularAvatarMenuItem item = Undo.AddComponent<ModularAvatarMenuItem>(go);
+            ModularAvatarMenuItem item = MenuItemUtility.CreateItem(parent, PoseAdjustName);
             item.Control = new VRCExpressionsMenu.Control
             {
                 name = PoseAdjustName,
@@ -272,7 +230,6 @@ namespace Supine.PosePack
             };
 
             // 同期と保存は MA Parameters の宣言が優先されるが、紛らわしくないよう揃えておく（保存しない）
-            item.MenuSource = SubmenuSource.Children;
             item.isSynced = true;
             item.isSaved = false;
             item.isDefault = false;
@@ -281,104 +238,13 @@ namespace Supine.PosePack
             EditorUtility.SetDirty(item);
         }
 
-        /// <summary>
-        /// 既存のメニュー項目をそのまま複製して足す。
-        /// 作り直すとアイコンや同期の設定を書き写すことになり、元を直したときにずれる。
-        /// </summary>
-        private static void CopyItem(GameObject template, Transform parent)
-        {
-            GameObject copy = Object.Instantiate(template, parent);
-            Undo.RegisterCreatedObjectUndo(copy, "Create Supine Pose Menu");
-            copy.name = template.name;
-        }
-
-        private static Transform CreateSubMenu(Transform parent, string name, Texture2D icon)
-        {
-            GameObject go = new GameObject(name);
-            Undo.RegisterCreatedObjectUndo(go, "Create Supine Pose Menu");
-            go.transform.SetParent(parent, false);
-
-            ModularAvatarMenuItem item = Undo.AddComponent<ModularAvatarMenuItem>(go);
-            item.Control = new VRCExpressionsMenu.Control
-            {
-                name = name,
-                icon = icon,
-                type = VRCExpressionsMenu.Control.ControlType.SubMenu,
-                parameter = new VRCExpressionsMenu.Control.Parameter { name = string.Empty },
-                subParameters = new VRCExpressionsMenu.Control.Parameter[0],
-                labels = new VRCExpressionsMenu.Control.Label[0],
-            };
-            item.MenuSource = SubmenuSource.Children;
-
-            EditorUtility.SetDirty(item);
-            return go.transform;
-        }
-
-        private static void CreateToggle(Transform parent, ResolvedPose pose)
-        {
-            string displayName = pose.Entry.ResolveDisplayName();
-
-            GameObject go = new GameObject(displayName);
-            Undo.RegisterCreatedObjectUndo(go, "Create Supine Pose Menu");
-            go.transform.SetParent(parent, false);
-
-            ModularAvatarMenuItem item = Undo.AddComponent<ModularAvatarMenuItem>(go);
-            item.Control = new VRCExpressionsMenu.Control
-            {
-                name = displayName,
-                icon = pose.Entry.icon,
-                type = VRCExpressionsMenu.Control.ControlType.Toggle,
-                parameter = new VRCExpressionsMenu.Control.Parameter { name = SupineNames.Parameters.Pose },
-                value = pose.Value,
-                subParameters = new VRCExpressionsMenu.Control.Parameter[0],
-                labels = new VRCExpressionsMenu.Control.Label[0],
-            };
-
-            // 既存のポーズ項目と同じ扱いにする。automaticValue を切らないと
-            // せっかく採番した VRCSupine の値を Modular Avatar が振り直してしまう
-            item.MenuSource = SubmenuSource.Children;
-            item.isSynced = true;
-            item.isSaved = false;
-            item.isDefault = false;
-            item.automaticValue = false;
-
-            EditorUtility.SetDirty(item);
-        }
-
         private static void WarnIfOverCapacity(Transform menu, List<string> warnings)
         {
-            if (menu.childCount <= MenuCapacity) return;
+            if (menu.childCount <= MenuItemUtility.MenuCapacity) return;
 
             warnings.Add(
                 "The '" + menu.name + "' menu now has " + menu.childCount +
-                " items, which is over the VRChat limit of " + MenuCapacity + ".");
-        }
-
-        private static Transform FindChild(Transform parent, string name)
-        {
-            foreach (Transform child in parent)
-            {
-                if (child.name == name) return child;
-            }
-            return null;
-        }
-
-        private static GameObject FindDescendantObject(Transform root, string name)
-        {
-            Transform found = FindDescendant(root, name);
-            return found == null ? null : found.gameObject;
-        }
-
-        private static Transform FindDescendant(Transform root, string name)
-        {
-            foreach (Transform child in root)
-            {
-                if (child.name == name) return child;
-
-                Transform found = FindDescendant(child, name);
-                if (found != null) return found;
-            }
-            return null;
+                " items, which is over the VRChat limit of " + MenuItemUtility.MenuCapacity + ".");
         }
     }
 }
