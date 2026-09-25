@@ -276,7 +276,7 @@ namespace Supine.PosePack
         {
             float value = ResolveDefaultValue(root, options, packPoses);
 
-            SetAnimatorParameterDefault(controller, value);
+            AnimatorParameterUtility.SetDefaultFloat(controller, CrouchPoseParameter, value);
             SetMenuParameterDefault(maPrefabInstance, value);
             MarkDefaultMenuItem(maPrefabInstance, value);
         }
@@ -299,23 +299,6 @@ namespace Supine.PosePack
             if (index < 0 || index >= root.children.Length) index = 0;
 
             return root.children[index].threshold;
-        }
-
-        private static void SetAnimatorParameterDefault(AnimatorController controller, float value)
-        {
-            AnimatorControllerParameter[] parameters = controller.parameters;
-            bool touched = false;
-
-            foreach (AnimatorControllerParameter parameter in parameters)
-            {
-                if (parameter.name != CrouchPoseParameter) continue;
-
-                parameter.defaultFloat = value;
-                touched = true;
-            }
-
-            // 配列は複製が返るため、書き戻さないと反映されない
-            if (touched) controller.parameters = parameters;
         }
 
         private static void SetMenuParameterDefault(GameObject maPrefabInstance, float value)
@@ -354,7 +337,7 @@ namespace Supine.PosePack
                 if (item.Control.parameter == null) continue;
                 if (item.Control.parameter.name != CrouchPoseParameter) continue;
 
-                item.isDefault = Mathf.Abs(item.Control.value - value) < SupineCrouchValues.Step * 0.25f;
+                item.isDefault = SupineCrouchValues.Approximately(item.Control.value, value);
                 EditorUtility.SetDirty(item);
             }
         }

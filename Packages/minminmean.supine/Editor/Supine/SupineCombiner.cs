@@ -306,25 +306,10 @@ namespace Supine
         /// <param name="enableJumpAtDesktop">bool デスクトップでジャンプを有効にするか</param>
         private void ToggleJumpMotion(AnimatorController supineLocomotion, bool enableJump, bool enableJumpAtDesktop)
         {
-            bool foundEnableJump = false;
-            bool foundEnableJumpAtDesktop = false;
-
-            AnimatorControllerParameter[] parameters = supineLocomotion.parameters;
-            foreach (AnimatorControllerParameter parameter in parameters)
-            {
-                if (parameter.name == SupineNames.Parameters.EnableJumpMotion)
-                {
-                    parameter.defaultBool = enableJump;
-                    foundEnableJump = true;
-                }
-                else if (parameter.name == SupineNames.Parameters.EnableJumpAtDesktop)
-                {
-                    parameter.defaultBool = enableJumpAtDesktop;
-                    foundEnableJumpAtDesktop = true;
-                }
-            }
-
-            supineLocomotion.parameters = parameters;
+            bool foundEnableJump = AnimatorParameterUtility.SetDefaultBool(
+                supineLocomotion, SupineNames.Parameters.EnableJumpMotion, enableJump);
+            bool foundEnableJumpAtDesktop = AnimatorParameterUtility.SetDefaultBool(
+                supineLocomotion, SupineNames.Parameters.EnableJumpAtDesktop, enableJumpAtDesktop);
 
             // パラメータが見つからなければ、オプションは黙って無視されたことになる。
             // テンプレートの作りが変わったときに気付けるよう、必ず声を上げる

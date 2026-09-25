@@ -393,47 +393,13 @@ namespace Supine
         /// </summary>
         private Vector3 CalculateClonePositionOffset()
         {
-            Vector3 destinationBottomRight = CalculateBottomRight(_destinationRoot);
-            Vector3 templateTopLeft = CalculateTopLeft(_templateRoot);
+            AnimatorStateUtility.GetNodeBounds(_destinationRoot, out _, out Vector3 destinationBottomRight);
+            AnimatorStateUtility.GetNodeBounds(_templateRoot, out Vector3 templateTopLeft, out _);
 
             return new Vector3(
                 destinationBottomRight.x + ClonePositionGap - templateTopLeft.x,
                 destinationBottomRight.y + ClonePositionGap - templateTopLeft.y,
                 0f);
-        }
-
-        private static Vector3 CalculateBottomRight(AnimatorStateMachine stateMachine)
-        {
-            Vector3 bottomRight = Vector3.Max(
-                stateMachine.anyStatePosition,
-                Vector3.Max(stateMachine.entryPosition, stateMachine.exitPosition));
-
-            foreach (ChildAnimatorState child in stateMachine.states)
-            {
-                bottomRight = Vector3.Max(bottomRight, child.position);
-            }
-            foreach (ChildAnimatorStateMachine child in stateMachine.stateMachines)
-            {
-                bottomRight = Vector3.Max(bottomRight, child.position);
-            }
-            return bottomRight;
-        }
-
-        private static Vector3 CalculateTopLeft(AnimatorStateMachine stateMachine)
-        {
-            Vector3 topLeft = Vector3.Min(
-                stateMachine.anyStatePosition,
-                Vector3.Min(stateMachine.entryPosition, stateMachine.exitPosition));
-
-            foreach (ChildAnimatorState child in stateMachine.states)
-            {
-                topLeft = Vector3.Min(topLeft, child.position);
-            }
-            foreach (ChildAnimatorStateMachine child in stateMachine.stateMachines)
-            {
-                topLeft = Vector3.Min(topLeft, child.position);
-            }
-            return topLeft;
         }
 
         // ------------------------------------------------------------

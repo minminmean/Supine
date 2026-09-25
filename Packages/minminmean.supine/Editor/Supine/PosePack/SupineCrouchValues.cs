@@ -38,13 +38,22 @@ namespace Supine.PosePack
             return index <= PositiveMax ? index * Step : -(index - PositiveMax) * Step;
         }
 
+        /// <summary>
+        /// 同じ枠を指す値か。float の往復で付く誤差を吸収する。
+        /// 許容幅は刻みの 1/4 なので、隣の枠と取り違えることは無い。
+        /// </summary>
+        public static bool Approximately(float a, float b)
+        {
+            return Mathf.Abs(a - b) <= Step * 0.25f;
+        }
+
         /// <summary>値から枠番号へ戻す。対応しない値なら -1</summary>
         public static int ToIndex(float value)
         {
             int steps = Mathf.RoundToInt(value / Step);
 
             // 刻みに乗っていない値は、別の仕組みが付けたものとみなして触らない
-            if (Mathf.Abs(value - steps * Step) > Step * 0.25f) return -1;
+            if (!Approximately(value, steps * Step)) return -1;
 
             if (steps >= 0) return steps <= PositiveMax ? steps : -1;
 

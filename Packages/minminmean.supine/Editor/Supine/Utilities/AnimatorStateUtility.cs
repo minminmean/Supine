@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEngine;
 using UnityEditor.Animations;
 
 namespace Supine.Utilities
@@ -64,6 +65,29 @@ namespace Supine.Utilities
                 }
             }
             return destinations;
+        }
+
+        /// <summary>
+        /// ステートマシンの直下にあるノードが画面上で占める範囲。
+        /// Entry / Exit / AnyState も場所を取るので含める。サブステートマシンの中までは見ない。
+        /// </summary>
+        public static void GetNodeBounds(AnimatorStateMachine stateMachine, out Vector3 min, out Vector3 max)
+        {
+            min = Vector3.Min(stateMachine.anyStatePosition,
+                Vector3.Min(stateMachine.entryPosition, stateMachine.exitPosition));
+            max = Vector3.Max(stateMachine.anyStatePosition,
+                Vector3.Max(stateMachine.entryPosition, stateMachine.exitPosition));
+
+            foreach (ChildAnimatorState child in stateMachine.states)
+            {
+                min = Vector3.Min(min, child.position);
+                max = Vector3.Max(max, child.position);
+            }
+            foreach (ChildAnimatorStateMachine child in stateMachine.stateMachines)
+            {
+                min = Vector3.Min(min, child.position);
+                max = Vector3.Max(max, child.position);
+            }
         }
 
         /// <summary>

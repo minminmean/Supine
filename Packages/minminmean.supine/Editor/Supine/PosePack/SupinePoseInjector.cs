@@ -326,41 +326,8 @@ namespace Supine.PosePack
         /// </summary>
         private static Vector3 FindFreeColumn(AnimatorStateMachine machine)
         {
-            float maxX = 0f;
-            float minY = 0f;
-            bool any = false;
-
-            foreach (ChildAnimatorState child in machine.states)
-            {
-                Extend(child.position, ref maxX, ref minY, ref any);
-            }
-            foreach (ChildAnimatorStateMachine child in machine.stateMachines)
-            {
-                Extend(child.position, ref maxX, ref minY, ref any);
-            }
-
-            // Entry / Exit / AnyState も画面上の場所を取るので、右端の計算に入れる
-            Extend(machine.entryPosition, ref maxX, ref minY, ref any);
-            Extend(machine.exitPosition, ref maxX, ref minY, ref any);
-            Extend(machine.anyStatePosition, ref maxX, ref minY, ref any);
-
-            if (!any) return Vector3.zero;
-
-            return new Vector3(maxX + ColumnGap, minY, 0f);
-        }
-
-        private static void Extend(Vector3 position, ref float maxX, ref float minY, ref bool any)
-        {
-            if (!any)
-            {
-                maxX = position.x;
-                minY = position.y;
-                any = true;
-                return;
-            }
-
-            if (position.x > maxX) maxX = position.x;
-            if (position.y < minY) minY = position.y;
+            AnimatorStateUtility.GetNodeBounds(machine, out Vector3 min, out Vector3 max);
+            return new Vector3(max.x + ColumnGap, min.y, 0f);
         }
 
         /// <summary>

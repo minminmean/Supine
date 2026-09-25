@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -58,6 +59,38 @@ namespace Supine.Utilities
             {
                 destination.parameters = merged.ToArray();
             }
+        }
+
+        /// <summary>名前が一致するパラメータの既定値を書き換える</summary>
+        /// <returns>該当するパラメータがあったか</returns>
+        public static bool SetDefaultBool(AnimatorController controller, string name, bool value)
+        {
+            return SetDefault(controller, name, parameter => parameter.defaultBool = value);
+        }
+
+        /// <inheritdoc cref="SetDefaultBool"/>
+        public static bool SetDefaultFloat(AnimatorController controller, string name, float value)
+        {
+            return SetDefault(controller, name, parameter => parameter.defaultFloat = value);
+        }
+
+        private static bool SetDefault(
+            AnimatorController controller, string name, Action<AnimatorControllerParameter> apply)
+        {
+            AnimatorControllerParameter[] parameters = controller.parameters;
+            bool found = false;
+
+            foreach (AnimatorControllerParameter parameter in parameters)
+            {
+                if (parameter.name != name) continue;
+
+                apply(parameter);
+                found = true;
+            }
+
+            // 配列は複製が返るため、書き戻さないと反映されない
+            if (found) controller.parameters = parameters;
+            return found;
         }
     }
 }
