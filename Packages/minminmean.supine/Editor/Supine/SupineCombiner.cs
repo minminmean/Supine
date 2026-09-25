@@ -102,13 +102,16 @@ namespace Supine
             {
                 ToggleJumpMotion(supineLocomotion, !options.disableJumpMotion, options.enableJumpAtDesktop);
             }
-            SetSittingAnimations(supineLocomotion, options.sittingPose1, options.sittingPose2, renamedStates);
+            // ここから先は生成物のステートを名前で引くので、実名への対応表を1つだけ作って回す
+            StateNameMap stateNames = new StateNameMap(options, renamedStates);
+
+            SetSittingAnimations(supineLocomotion, options.sittingPose1, options.sittingPose2, stateNames);
 
             // プロジェクトに置かれたポーズパックを差し込む。
             // パックが1つも無ければ何も起きないため、従来どおりの生成物になる
             List<string> posePackWarnings = new List<string>();
             List<PosePack.ResolvedPose> injectedPoses = InjectPosePacks(
-                supineLocomotion, options, renamedStates, posePackWarnings);
+                supineLocomotion, stateNames, posePackWarnings);
 
             EditorUtility.SetDirty(supineLocomotion);
             AssetDatabase.SaveAssets();
@@ -142,8 +145,7 @@ namespace Supine
             // しゃがみポーズの切り替えを組み込む。
             // ポーズとは別の軸なので、パックが1つも無くても効く
             PosePack.SupineCrouchInjector.Inject(
-                supineLocomotion, maPrefabInstance,
-                BuildPoseStateNameMap(options, renamedStates), options, posePackWarnings);
+                supineLocomotion, maPrefabInstance, stateNames, options, posePackWarnings);
 
             // 末尾の項目を各ページへ複製するので、しゃがみのメニューが出来上がってから畳む
             PosePack.SupinePoseMenuBuilder.PaginateRoot(maPrefabInstance, posePackWarnings);
@@ -331,54 +333,14 @@ namespace Supine
         /// </summary>
         /// <returns>差し込めたポーズの一覧。メニュー生成が同じ並びを使う</returns>
         private List<PosePack.ResolvedPose> InjectPosePacks(
-            AnimatorController supineLocomotion,
-            SupineCombineOptions options,
-            IReadOnlyDictionary<string, string> renamedStates,
-            List<string> warnings)
+            AnimatorController supineLocomotion, StateNameMap stateNames, List<string> warnings)
         {
             List<PosePack.ResolvedPose> resolved =
                 PosePack.SupinePosePackRegistry.Resolve(supineLocomotion, warnings);
 
             if (resolved.Count == 0) return resolved;
 
-            return new PosePack.SupinePoseInjector(
-                    supineLocomotion, BuildPoseStateNameMap(options, renamedStates), warnings)
-                .Inject(resolved);
-        }
-
-        /// <summary>
-        /// テンプレート側のステート名から、生成物での実名を引く表を作る。
-        ///
-        /// 追加モードでは食い違いが2種類ある。
-        /// ・流用したステート（しゃがみ、伏せ）は追加先の名前になる。こちらはRenamedStatesに載らない
-        /// ・複製したステートは名前が衝突するとUnityが連番を付ける。こちらはRenamedStatesに載る
-        /// 前者を拾い損ねると、入口のステート名を変えているアバターでポーズが黙って増えなくなる。
-        /// </summary>
-        private static IReadOnlyDictionary<string, string> BuildPoseStateNameMap(
-            SupineCombineOptions options, IReadOnlyDictionary<string, string> renamedStates)
-        {
-            Dictionary<string, string> map = new Dictionary<string, string>();
-
-            if (options.mode == SupineCombineMode.Add)
-            {
-                foreach (KeyValuePair<string, string> pair in
-                         SupineLocomotionAdder.BuildStateNameOverrides(options))
-                {
-                    // 空文字は「対応するステートを持たせない」の意味なので、名前としては使えない
-                    if (string.IsNullOrEmpty(pair.Value)) continue;
-                    map[pair.Key] = pair.Value;
-                }
-            }
-
-            if (renamedStates != null)
-            {
-                foreach (KeyValuePair<string, string> pair in renamedStates)
-                {
-                    map[pair.Key] = pair.Value;
-                }
-            }
-
-            return map;
+            return new PosePack.SupinePoseInjector(supineLocomotion, stateNames, warnings).Inject(resolved);
         }
 
         /// <summary>
@@ -387,28 +349,19 @@ namespace Supine
         /// <param name="supineLocomotion">ごろ寝システムのBaseコントローラ</param>
         /// <param name="sittingPose1">SittingPose 座りポーズ1</param>
         /// <param name="sittingPose2">SittingPose 座りポーズ2</param>
-        /// <param name="renamedStates">追加時にリネームされたステートの対応表</param>
+        /// <param name="stateNames">生成物での実名への対応表</param>
         private void SetSittingAnimations(
             AnimatorController supineLocomotion,
             SittingPose sittingPose1,
             SittingPose sittingPose2,
-            IReadOnlyDictionary<string, string> renamedStates)
+            StateNameMap stateNames)
         {
             // statesを取り出し
             ChildAnimatorState[] supineLocomotionStates = supineLocomotion.layers[0].stateMachine.states;
 
             // 座りアニメーションを変更
-            SetSittingAnimation(supineLocomotionStates, ResolveStateName(SupineNames.States.Sit1, renamedStates), sittingPose1);
-            SetSittingAnimation(supineLocomotionStates, ResolveStateName(SupineNames.States.Sit2, renamedStates), sittingPose2);
-        }
-
-        /// <summary>
-        /// 追加時に名前が衝突してリネームされている場合、生成物での実名を返す
-        /// </summary>
-        private static string ResolveStateName(string name, IReadOnlyDictionary<string, string> renamedStates)
-        {
-            if (renamedStates != null && renamedStates.TryGetValue(name, out string renamed)) return renamed;
-            return name;
+            SetSittingAnimation(supineLocomotionStates, stateNames.Resolve(SupineNames.States.Sit1), sittingPose1);
+            SetSittingAnimation(supineLocomotionStates, stateNames.Resolve(SupineNames.States.Sit2), sittingPose2);
         }
 
         private void SetSittingAnimation(ChildAnimatorState[] states, string stateName, SittingPose pose)

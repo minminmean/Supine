@@ -38,7 +38,7 @@ namespace Supine.PosePack
         public static void Inject(
             AnimatorController controller,
             GameObject maPrefabInstance,
-            IReadOnlyDictionary<string, string> stateNames,
+            StateNameMap stateNames,
             SupineCombineOptions options,
             List<string> warnings)
         {
@@ -54,7 +54,8 @@ namespace Supine.PosePack
             BlendTree template = LoadTemplateTree();
             if (template == null) return;
 
-            AnimatorState crouching = FindState(controller, ResolveName(CrouchingStateName, stateNames));
+            AnimatorState crouching =
+                AnimatorStateUtility.FindState(controller, stateNames.Resolve(CrouchingStateName))?.State;
             if (crouching == null)
             {
                 warnings.Add(
@@ -118,7 +119,7 @@ namespace Supine.PosePack
 
             if (source == null) return null;
 
-            AnimatorState state = FindState(source, stateName);
+            AnimatorState state = AnimatorStateUtility.FindState(source, stateName)?.State;
             if (state == null) return null;
 
             BlendTree tree = state.motion as BlendTree;
@@ -370,26 +371,6 @@ namespace Supine.PosePack
             return maPrefabInstance == null
                 ? null
                 : maPrefabInstance.GetComponentInChildren<ModularAvatarParameters>(true);
-        }
-
-        private static string ResolveName(string name, IReadOnlyDictionary<string, string> stateNames)
-        {
-            if (stateNames != null && stateNames.TryGetValue(name, out string resolved)) return resolved;
-            return name;
-        }
-
-        private static AnimatorState FindState(AnimatorController controller, string name)
-        {
-            foreach (AnimatorControllerLayer layer in controller.layers)
-            {
-                if (layer.stateMachine == null) continue;
-
-                foreach (AnimatorState state in AnimatorStateUtility.CollectStates(layer.stateMachine))
-                {
-                    if (state.name == name) return state;
-                }
-            }
-            return null;
         }
     }
 }

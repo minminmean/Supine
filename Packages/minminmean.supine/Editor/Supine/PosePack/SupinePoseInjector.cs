@@ -52,16 +52,13 @@ namespace Supine.PosePack
         private const float RowGap = 110f;
 
         private readonly AnimatorController _controller;
-        private readonly IReadOnlyDictionary<string, string> _renamedStates;
+        private readonly StateNameMap _stateNames;
         private readonly List<string> _warnings;
 
-        public SupinePoseInjector(
-            AnimatorController controller,
-            IReadOnlyDictionary<string, string> renamedStates,
-            List<string> warnings)
+        public SupinePoseInjector(AnimatorController controller, StateNameMap stateNames, List<string> warnings)
         {
             _controller = controller;
-            _renamedStates = renamedStates;
+            _stateNames = stateNames;
             _warnings = warnings;
         }
 
@@ -332,62 +329,18 @@ namespace Supine.PosePack
 
         /// <summary>
         /// ステートを名前で探す。layerIndex を指定すると、そのレイヤーの中だけを見る。
+        /// 追加モードで名前が変わっていても、生成物での実名で引く。
         /// </summary>
         private StateLocation FindState(string name, int layerIndex = -1)
         {
-            string resolved = ResolveStateName(name);
-
-            AnimatorControllerLayer[] layers = _controller.layers;
-            for (int i = 0; i < layers.Length; i++)
-            {
-                if (layerIndex >= 0 && i != layerIndex) continue;
-                if (layers[i].stateMachine == null) continue;
-
-                StateLocation found = FindState(layers[i].stateMachine, resolved, i);
-                if (found != null) return found;
-            }
+            string resolved = _stateNames.Resolve(name);
+            StateLocation found = AnimatorStateUtility.FindState(_controller, resolved, layerIndex);
+            if (found != null) return found;
 
             _warnings.Add(
                 "Could not find the state '" + resolved +
                 "' in the generated controller. Pose packs were not applied.");
             return null;
-        }
-
-        private static StateLocation FindState(AnimatorStateMachine machine, string name, int layerIndex)
-        {
-            foreach (ChildAnimatorState child in machine.states)
-            {
-                if (child.state != null && child.state.name == name)
-                {
-                    return new StateLocation { Machine = machine, State = child.state, LayerIndex = layerIndex };
-                }
-            }
-
-            foreach (ChildAnimatorStateMachine child in machine.stateMachines)
-            {
-                if (child.stateMachine == null) continue;
-
-                StateLocation found = FindState(child.stateMachine, name, layerIndex);
-                if (found != null) return found;
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// 追加モードで名前が衝突してリネームされている場合、生成物での実名を返す。
-        /// </summary>
-        private string ResolveStateName(string name)
-        {
-            if (_renamedStates != null && _renamedStates.TryGetValue(name, out string renamed)) return renamed;
-            return name;
-        }
-
-        private sealed class StateLocation
-        {
-            public AnimatorStateMachine Machine;
-            public AnimatorState State;
-            public int LayerIndex;
         }
     }
 }
