@@ -18,15 +18,15 @@ namespace Supine
     }
 
     /// <summary>
-    /// ポーズ1つ分の定義。
+    /// 寝ポーズとしゃがみポーズに共通する定義。
     ///
-    /// structではなくclassにしているのは、uprightThresholdに既定値を持たせるため。
-    /// structだと未設定が0になり、「しゃがんだ瞬間に解除されるポーズ」が黙って出来上がる。
+    /// 採番・検証・メニュー項目の生成はこの形だけを見て、両者を同じ手順で扱う。
+    /// フィールド名は派生側にあったころと同じにしているので、保存済みのパックはそのまま読める。
     /// </summary>
     [Serializable]
-    public class SupinePoseEntry
+    public abstract class SupinePoseEntryBase
     {
-        /// <summary>ステート名に使う識別子。パック内で一意にする（例: "YTB"）</summary>
+        /// <summary>パック内で一意な識別子。寝ポーズではステート名にも使う（例: "YTB"）</summary>
         public string id = string.Empty;
 
         /// <summary>メニューに出す名前。空ならidを使う</summary>
@@ -37,25 +37,25 @@ namespace Supine
 
         /// <summary>
         /// ポーズのアニメーションクリップ。
-        /// キーを2つ以上持たせると、その間を Pose Adjust（VRCSupinePoseAdjust）でスクラブできる。
-        /// キーが1つでも動作するが、その場合は調整軸を持たないポーズになる。
+        ///
+        /// 寝ポーズでは、キーを2つ以上持たせるとその間を Pose Adjust（VRCSupinePoseAdjust）で
+        /// スクラブできる。キーが1つでも動作するが、その場合は調整軸を持たないポーズになる。
+        ///
+        /// しゃがみポーズでは、しゃがんだまま止まっているときの姿勢。
+        /// 歩き出したときの動きは標準のものを流用するので、ここだけ用意すればよい。
         /// </summary>
         public AnimationClip clip;
 
         /// <summary>
-        /// このポーズへ入る Upright の閾値。腰の高さに対応させる。
-        /// 既存ポーズの実測値は 寝転び系=0.41 / SRAG=0.55 / 座位系=0.55〜0.62。
-        /// 出口は生成側が threshold + UprightHysteresis で作るため、ここには入口だけを書く。
-        /// </summary>
-        [Range(0.1f, 0.9f)]
-        public float uprightThreshold = 0.41f;
-
-        /// <summary>トラッキングの扱い</summary>
-        public SupinePoseHeadTracking headTracking = SupinePoseHeadTracking.Animation;
-
-        /// <summary>
-        /// 使ってほしい VRCSupine の値。0なら生成時に自動採番する。
-        /// 他と衝突した場合も自動採番へ回されるため、ここは希望であって保証ではない。
+        /// 使ってほしい番号。0なら生成時に自動で空きを割り当てる。
+        /// 寝ポーズでは VRCSupine の値、しゃがみポーズでは枠番号になる。
+        ///
+        /// しゃがみの0番は本体の Default（そのアバターが元々そうだった姿）の指定席なので取れない。
+        /// 本体が 0〜6 を使うため、パックは 7 以降を指定することになる。
+        ///
+        /// 組込をやり直しても同じ番号が付かないと、メニューに保存された選択が
+        /// 別のポーズに化ける。他と衝突した場合や範囲外の場合は空き番号へ回されるので、
+        /// ここは希望であって保証ではない。
         /// </summary>
         public int preferredValue;
 
@@ -66,6 +66,27 @@ namespace Supine
     }
 
     /// <summary>
+    /// 寝ポーズ1つ分の定義。
+    ///
+    /// structではなくclassにしているのは、uprightThresholdに既定値を持たせるため。
+    /// structだと未設定が0になり、「しゃがんだ瞬間に解除されるポーズ」が黙って出来上がる。
+    /// </summary>
+    [Serializable]
+    public class SupinePoseEntry : SupinePoseEntryBase
+    {
+        /// <summary>
+        /// このポーズへ入る Upright の閾値。腰の高さに対応させる。
+        /// 既存ポーズの実測値は 寝転び系=0.41 / SRAG=0.55 / 座位系=0.55〜0.62。
+        /// 出口は生成側が threshold + UprightHysteresis で作るため、ここには入口だけを書く。
+        /// </summary>
+        [Range(0.1f, 0.9f)]
+        public float uprightThreshold = 0.41f;
+
+        /// <summary>トラッキングの扱い</summary>
+        public SupinePoseHeadTracking headTracking = SupinePoseHeadTracking.Animation;
+    }
+
+    /// <summary>
     /// しゃがみポーズ1つ分の定義。
     ///
     /// 寝ポーズと違い、しゃがみはステートを増やさない。しゃがみステートに差さった
@@ -73,39 +94,8 @@ namespace Supine
     /// 方向の枝は既存のものを丸ごと借りるので、用意するのは中心の待機クリップ1本。
     /// </summary>
     [Serializable]
-    public class SupineCrouchEntry
+    public class SupineCrouchEntry : SupinePoseEntryBase
     {
-        /// <summary>パック内で一意な識別子</summary>
-        public string id = string.Empty;
-
-        /// <summary>メニューに出す名前。空ならidを使う</summary>
-        public string displayName = string.Empty;
-
-        /// <summary>メニューのアイコン。無くてもよい</summary>
-        public Texture2D icon;
-
-        /// <summary>
-        /// しゃがんだまま止まっているときの姿勢。
-        /// 歩き出したときの動きは標準のものを流用するので、ここだけ用意すればよい。
-        /// </summary>
-        public AnimationClip clip;
-
-        /// <summary>
-        /// 使ってほしい枠番号。0なら生成時に自動で空きを割り当てる。
-        ///
-        /// 0番は本体の Default（そのアバターが元々そうだった姿）の指定席なので取れない。
-        /// 本体が 0〜6 を使うため、パックは 7 以降を指定することになる。
-        ///
-        /// 組込をやり直しても同じ番号が付かないと、メニューは保存されるぶん
-        /// 「前回選んだしゃがみが別のものに化ける」。希望が埋まっていた場合は
-        /// 空き番号へ回されるので、ここは希望であって保証ではない。
-        /// </summary>
-        public int preferredValue;
-
-        public string ResolveDisplayName()
-        {
-            return string.IsNullOrEmpty(displayName) ? id : displayName;
-        }
     }
 
     /// <summary>

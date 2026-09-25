@@ -38,6 +38,7 @@ namespace Supine.PosePack
         public static void Inject(
             AnimatorController controller,
             GameObject maPrefabInstance,
+            IReadOnlyList<SupinePosePack> packs,
             StateNameMap stateNames,
             SupineCombineOptions options,
             List<string> warnings)
@@ -66,7 +67,7 @@ namespace Supine.PosePack
 
             // パックが足すしゃがみ。1つも無ければ従来どおりテンプレートの7種だけになる
             List<ResolvedCrouchPose> packPoses =
-                SupinePosePackRegistry.ResolveCrouch(template, warnings);
+                SupinePosePackRegistry.ResolveCrouch(packs, template, warnings);
 
             BlendTree root = BuildRootTree(template, crouching.motion, controller, packPoses, warnings);
             if (root == null) return;
@@ -74,14 +75,6 @@ namespace Supine.PosePack
             crouching.motion = root;
             SupineCrouchMenuBuilder.Build(maPrefabInstance, packPoses, warnings);
             ApplyDefaultPose(controller, maPrefabInstance, root, options, packPoses);
-        }
-
-        /// <summary>
-        /// 既定にしたいしゃがみを指す文字列。パック側のポーズを選んだときだけ使う。
-        /// </summary>
-        public static string MakeKey(SupinePosePack pack, SupineCrouchEntry entry)
-        {
-            return pack.ResolvePackId() + "/" + entry.id;
         }
 
         /// <summary>
@@ -291,7 +284,7 @@ namespace Supine.PosePack
             {
                 foreach (ResolvedCrouchPose pose in packPoses)
                 {
-                    if (MakeKey(pose.Pack, pose.Entry) == options.defaultCrouchPoseKey) return pose.Value;
+                    if (pose.Key == options.defaultCrouchPoseKey) return pose.Value;
                 }
             }
 

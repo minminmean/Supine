@@ -110,8 +110,9 @@ namespace Supine
             // プロジェクトに置かれたポーズパックを差し込む。
             // パックが1つも無ければ何も起きないため、従来どおりの生成物になる
             List<string> posePackWarnings = new List<string>();
+            List<SupinePosePack> packs = PosePack.SupinePosePackRegistry.CollectPacks(posePackWarnings);
             List<PosePack.ResolvedPose> injectedPoses = InjectPosePacks(
-                supineLocomotion, stateNames, posePackWarnings);
+                supineLocomotion, packs, stateNames, posePackWarnings);
 
             EditorUtility.SetDirty(supineLocomotion);
             AssetDatabase.SaveAssets();
@@ -145,7 +146,7 @@ namespace Supine
             // しゃがみポーズの切り替えを組み込む。
             // ポーズとは別の軸なので、パックが1つも無くても効く
             PosePack.SupineCrouchInjector.Inject(
-                supineLocomotion, maPrefabInstance, stateNames, options, posePackWarnings);
+                supineLocomotion, maPrefabInstance, packs, stateNames, options, posePackWarnings);
 
             // 末尾の項目を各ページへ複製するので、しゃがみのメニューが出来上がってから畳む
             PosePack.SupinePoseMenuBuilder.PaginateRoot(maPrefabInstance, posePackWarnings);
@@ -333,10 +334,11 @@ namespace Supine
         /// </summary>
         /// <returns>差し込めたポーズの一覧。メニュー生成が同じ並びを使う</returns>
         private List<PosePack.ResolvedPose> InjectPosePacks(
-            AnimatorController supineLocomotion, StateNameMap stateNames, List<string> warnings)
+            AnimatorController supineLocomotion, IReadOnlyList<SupinePosePack> packs,
+            StateNameMap stateNames, List<string> warnings)
         {
             List<PosePack.ResolvedPose> resolved =
-                PosePack.SupinePosePackRegistry.Resolve(supineLocomotion, warnings);
+                PosePack.SupinePosePackRegistry.Resolve(packs, supineLocomotion, warnings);
 
             if (resolved.Count == 0) return resolved;
 

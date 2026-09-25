@@ -246,8 +246,7 @@ namespace Supine
             else
             {
                 PosePack.ResolvedCrouchPose pose = _crouchPackPoses[chosen - builtIn.Length];
-                _options.defaultCrouchPoseKey =
-                    PosePack.SupineCrouchInjector.MakeKey(pose.Pack, pose.Entry);
+                _options.defaultCrouchPoseKey = pose.Key;
             }
         }
 
@@ -264,9 +263,7 @@ namespace Supine
             {
                 for (int i = 0; i < _crouchPackPoses.Count; i++)
                 {
-                    PosePack.ResolvedCrouchPose pose = _crouchPackPoses[i];
-                    if (PosePack.SupineCrouchInjector.MakeKey(pose.Pack, pose.Entry)
-                        != _options.defaultCrouchPoseKey) continue;
+                    if (_crouchPackPoses[i].Key != _options.defaultCrouchPoseKey) continue;
 
                     return builtInCount + i;
                 }
