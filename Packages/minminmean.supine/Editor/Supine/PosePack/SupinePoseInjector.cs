@@ -18,19 +18,15 @@ namespace Supine.PosePack
     /// </summary>
     internal sealed class SupinePoseInjector
     {
-        public const string PoseParameter = "VRCSupine";
-
-        /// <summary>クリップのキーの間をスクラブする軸。メニュー側もこれを回す</summary>
-        public const string AdjustParameter = "VRCSupinePoseAdjust";
-
-        /// <summary>調整中であることを示すフラグ。ラジアルを開いている間だけ立つ</summary>
-        public const string AdjustingParameter = "VRCSupinePoseAdjusting";
-        private const string UprightParameter = "Upright";
+        private const string PoseParameter = SupineNames.Parameters.Pose;
+        private const string AdjustParameter = SupineNames.Parameters.PoseAdjust;
+        private const string AdjustingParameter = SupineNames.Parameters.PoseAdjusting;
+        private const string UprightParameter = SupineNames.Parameters.Upright;
         private const string LockPoseParameter = "VRCLockPose";
         private const string PoseChangedParameter = "PoseChanged";
         private const string CurrentPoseParameter = "CurrentPose";
 
-        private const string CrouchingStateName = "Crouching";
+        private const string CrouchingStateName = SupineNames.States.Crouching;
         private const string PoseChangeStateName = "Pose Change";
         private const string PrepareSupineStateName = "Prepare Supine";
         private const string PrepareAnimationStateName = "Prepare Animation";
@@ -56,16 +52,13 @@ namespace Supine.PosePack
         private const float RowGap = 110f;
 
         private readonly AnimatorController _controller;
-        private readonly IReadOnlyDictionary<string, string> _renamedStates;
+        private readonly StateNameMap _stateNames;
         private readonly List<string> _warnings;
 
-        public SupinePoseInjector(
-            AnimatorController controller,
-            IReadOnlyDictionary<string, string> renamedStates,
-            List<string> warnings)
+        public SupinePoseInjector(AnimatorController controller, StateNameMap stateNames, List<string> warnings)
         {
             _controller = controller;
-            _renamedStates = renamedStates;
+            _stateNames = stateNames;
             _warnings = warnings;
         }
 
@@ -330,101 +323,24 @@ namespace Supine.PosePack
         /// </summary>
         private static Vector3 FindFreeColumn(AnimatorStateMachine machine)
         {
-            float maxX = 0f;
-            float minY = 0f;
-            bool any = false;
-
-            foreach (ChildAnimatorState child in machine.states)
-            {
-                Extend(child.position, ref maxX, ref minY, ref any);
-            }
-            foreach (ChildAnimatorStateMachine child in machine.stateMachines)
-            {
-                Extend(child.position, ref maxX, ref minY, ref any);
-            }
-
-            // Entry / Exit / AnyState も画面上の場所を取るので、右端の計算に入れる
-            Extend(machine.entryPosition, ref maxX, ref minY, ref any);
-            Extend(machine.exitPosition, ref maxX, ref minY, ref any);
-            Extend(machine.anyStatePosition, ref maxX, ref minY, ref any);
-
-            if (!any) return Vector3.zero;
-
-            return new Vector3(maxX + ColumnGap, minY, 0f);
-        }
-
-        private static void Extend(Vector3 position, ref float maxX, ref float minY, ref bool any)
-        {
-            if (!any)
-            {
-                maxX = position.x;
-                minY = position.y;
-                any = true;
-                return;
-            }
-
-            if (position.x > maxX) maxX = position.x;
-            if (position.y < minY) minY = position.y;
+            AnimatorStateUtility.GetNodeBounds(machine, out Vector3 min, out Vector3 max);
+            return new Vector3(max.x + ColumnGap, min.y, 0f);
         }
 
         /// <summary>
         /// ステートを名前で探す。layerIndex を指定すると、そのレイヤーの中だけを見る。
+        /// 追加モードで名前が変わっていても、生成物での実名で引く。
         /// </summary>
         private StateLocation FindState(string name, int layerIndex = -1)
         {
-            string resolved = ResolveStateName(name);
-
-            AnimatorControllerLayer[] layers = _controller.layers;
-            for (int i = 0; i < layers.Length; i++)
-            {
-                if (layerIndex >= 0 && i != layerIndex) continue;
-                if (layers[i].stateMachine == null) continue;
-
-                StateLocation found = FindState(layers[i].stateMachine, resolved, i);
-                if (found != null) return found;
-            }
+            string resolved = _stateNames.Resolve(name);
+            StateLocation found = AnimatorStateUtility.FindState(_controller, resolved, layerIndex);
+            if (found != null) return found;
 
             _warnings.Add(
                 "Could not find the state '" + resolved +
                 "' in the generated controller. Pose packs were not applied.");
             return null;
-        }
-
-        private static StateLocation FindState(AnimatorStateMachine machine, string name, int layerIndex)
-        {
-            foreach (ChildAnimatorState child in machine.states)
-            {
-                if (child.state != null && child.state.name == name)
-                {
-                    return new StateLocation { Machine = machine, State = child.state, LayerIndex = layerIndex };
-                }
-            }
-
-            foreach (ChildAnimatorStateMachine child in machine.stateMachines)
-            {
-                if (child.stateMachine == null) continue;
-
-                StateLocation found = FindState(child.stateMachine, name, layerIndex);
-                if (found != null) return found;
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// 追加モードで名前が衝突してリネームされている場合、生成物での実名を返す。
-        /// </summary>
-        private string ResolveStateName(string name)
-        {
-            if (_renamedStates != null && _renamedStates.TryGetValue(name, out string renamed)) return renamed;
-            return name;
-        }
-
-        private sealed class StateLocation
-        {
-            public AnimatorStateMachine Machine;
-            public AnimatorState State;
-            public int LayerIndex;
         }
     }
 }

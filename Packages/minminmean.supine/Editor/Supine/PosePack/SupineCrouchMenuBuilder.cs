@@ -1,14 +1,18 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
-using VRC.SDK3.Avatars.ScriptableObjects;
+using Supine.Utilities;
 using ModularAvatarMenuItem = nadena.dev.modular_avatar.core.ModularAvatarMenuItem;
-using SubmenuSource = nadena.dev.modular_avatar.core.SubmenuSource;
+using ModularAvatarParameters = nadena.dev.modular_avatar.core.ModularAvatarParameters;
+using ParameterConfig = nadena.dev.modular_avatar.core.ParameterConfig;
 
 namespace Supine.PosePack
 {
     /// <summary>
-    /// パックが足したしゃがみポーズを Crouch Poses サブメニューへ並べる。
+    /// SupineMA Prefab のしゃがみポーズまわりを整える。
+    /// パックが足したしゃがみの項目、既定のしゃがみの印、既存を優先したときの後片付け。
+    ///
+    /// パックのしゃがみは Crouch Poses サブメニューへ並べる。
     ///
     /// 寝ポーズのメニューと違い、パックごとに階層を分けない。
     /// しゃがみは1つのパラメータを共有する排他の選択なので、
@@ -19,21 +23,42 @@ namespace Supine.PosePack
     /// </summary>
     internal static class SupineCrouchMenuBuilder
     {
-        private const string CrouchMenuName = "Crouch Poses";
-        private const string CrouchPoseParameter = "CrouchPose";
+        private const string CrouchMenuName = SupineNames.Menus.CrouchPoses;
+        private const string CrouchPoseParameter = SupineNames.Parameters.CrouchPose;
 
-        /// <summary>VRChatのメニュー1ページに入る項目数</summary>
-        private const int MenuCapacity = 8;
-
-        private const string NextPageName = "Next";
-
+        /// <summary>
+        /// 組み込んだしゃがみに合わせてメニューを整える。
+        /// </summary>
         public static void Build(
-            GameObject maPrefabInstance, IReadOnlyList<ResolvedCrouchPose> poses, List<string> warnings)
+            GameObject maPrefabInstance, SupineCrouchInjection injection, List<string> warnings)
         {
             if (maPrefabInstance == null) return;
+
+            AddPackPoses(maPrefabInstance, injection.PackPoses, warnings);
+
+            // 送りページまで出来上がってから印を付ける。項目はどのページにも居うる
+            SetMenuParameterDefault(maPrefabInstance, injection.DefaultValue);
+            MarkDefaultMenuItem(maPrefabInstance, injection.DefaultValue);
+        }
+
+        /// <summary>
+        /// 既存のしゃがみ切り替えを活かすなら、こちらのメニューもパラメータも要らない。
+        /// 残すと「押しても何も起きない項目」が並び、同期枠も8bit無駄になる。
+        /// </summary>
+        public static void Remove(GameObject maPrefabInstance)
+        {
+            if (maPrefabInstance == null) return;
+
+            RemoveMenu(maPrefabInstance);
+            RemoveParameter(maPrefabInstance);
+        }
+
+        private static void AddPackPoses(
+            GameObject maPrefabInstance, IReadOnlyList<ResolvedCrouchPose> poses, List<string> warnings)
+        {
             if (poses == null || poses.Count == 0) return;
 
-            Transform menu = FindDescendant(maPrefabInstance.transform, CrouchMenuName);
+            Transform menu = MenuItemUtility.FindDescendant(maPrefabInstance.transform, CrouchMenuName);
             if (menu == null)
             {
                 warnings.Add(
@@ -42,14 +67,15 @@ namespace Supine.PosePack
                 return;
             }
 
-            Texture2D icon = ResolveIcon(menu);
-
             foreach (ResolvedCrouchPose pose in poses)
             {
-                CreateToggle(menu, pose);
+                // 既存のしゃがみ項目と同じく保存する
+                MenuItemUtility.CreateToggle(
+                    menu, pose.Entry.ResolveDisplayName(), pose.Entry.icon,
+                    CrouchPoseParameter, pose.Value, true);
             }
 
-            Paginate(menu, icon);
+            Paginate(menu);
         }
 
         /// <summary>
@@ -58,102 +84,89 @@ namespace Supine.PosePack
         /// 先に項目を全部足してから畳む。足しながらページを割ると、
         /// 「あと何個来るか」を知らないまま送りを作ることになり、
         /// 1個しか溢れていないのに送りページが生える場合が出る。
+        ///
+        /// 送りページのアイコンは親のものを借りる。
+        /// 無地のまま並ぶより、同じ絵が続くほうが同じ話の続きだと分かる。
         /// </summary>
-        private static void Paginate(Transform page, Texture2D icon)
+        private static void Paginate(Transform menu)
         {
-            while (page.childCount > MenuCapacity)
+            List<Transform> items = new List<Transform>();
+            foreach (Transform child in menu) items.Add(child);
+
+            // 末尾に添える項目が無いので、どのページも必ず1つは置ける
+            List<int> pages = MenuItemUtility.SplitIntoPages(items.Count, 0, 0);
+            MenuItemUtility.DistributeToPages(menu, items, pages, null, MenuItemUtility.GetIcon(menu));
+        }
+
+        private static void SetMenuParameterDefault(GameObject maPrefabInstance, float value)
+        {
+            ModularAvatarParameters parameters = FindParameters(maPrefabInstance);
+            if (parameters == null) return;
+
+            for (int i = 0; i < parameters.parameters.Count; i++)
             {
-                // 送り自身が1枠使うので、このページに残せるのは MenuCapacity - 1 個
-                List<Transform> overflow = new List<Transform>();
-                for (int i = MenuCapacity - 1; i < page.childCount; i++)
-                {
-                    overflow.Add(page.GetChild(i));
-                }
+                if (parameters.parameters[i].nameOrPrefix != CrouchPoseParameter) continue;
 
-                Transform next = CreateSubMenu(page, NextPageName, icon);
-                foreach (Transform child in overflow)
-                {
-                    child.SetParent(next, false);
-                }
+                ParameterConfig config = parameters.parameters[i];
+                config.defaultValue = value;
+                config.hasExplicitDefaultValue = true;
+                parameters.parameters[i] = config;
 
-                next.SetSiblingIndex(MenuCapacity - 1);
-                page = next;
+                EditorUtility.SetDirty(parameters);
+                return;
             }
         }
 
         /// <summary>
-        /// 送りページのアイコンは親のものを借りる。
-        /// 無地のまま並ぶより、同じ絵が続くほうが同じ話の続きだと分かる。
+        /// メニュー上でも既定のポーズに印を移す。
+        ///
+        /// 並びの何番目かではなく、項目が書き込む値で合わせる。
+        /// 項目が増えてページ送りが出ると、番号と枠番号は一致しなくなる。
         /// </summary>
-        private static Texture2D ResolveIcon(Transform menu)
+        private static void MarkDefaultMenuItem(GameObject maPrefabInstance, float value)
         {
-            ModularAvatarMenuItem item = menu.GetComponent<ModularAvatarMenuItem>();
-            return item != null && item.Control != null ? item.Control.icon : null;
-        }
+            Transform menu = MenuItemUtility.FindDescendant(maPrefabInstance.transform, CrouchMenuName);
+            if (menu == null) return;
 
-        private static Transform CreateSubMenu(Transform parent, string name, Texture2D icon)
-        {
-            GameObject go = new GameObject(name);
-            Undo.RegisterCreatedObjectUndo(go, "Create Crouch Pose Menu");
-            go.transform.SetParent(parent, false);
-
-            ModularAvatarMenuItem item = Undo.AddComponent<ModularAvatarMenuItem>(go);
-            item.Control = new VRCExpressionsMenu.Control
+            foreach (ModularAvatarMenuItem item in menu.GetComponentsInChildren<ModularAvatarMenuItem>(true))
             {
-                name = name,
-                icon = icon,
-                type = VRCExpressionsMenu.Control.ControlType.SubMenu,
-                parameter = new VRCExpressionsMenu.Control.Parameter { name = string.Empty },
-                subParameters = new VRCExpressionsMenu.Control.Parameter[0],
-                labels = new VRCExpressionsMenu.Control.Label[0],
-            };
-            item.MenuSource = SubmenuSource.Children;
+                if (item.Control == null) continue;
+                if (item.Control.parameter == null) continue;
+                if (item.Control.parameter.name != CrouchPoseParameter) continue;
 
-            EditorUtility.SetDirty(item);
-            return go.transform;
-        }
-
-        private static void CreateToggle(Transform parent, ResolvedCrouchPose pose)
-        {
-            string displayName = pose.Entry.ResolveDisplayName();
-
-            GameObject go = new GameObject(displayName);
-            Undo.RegisterCreatedObjectUndo(go, "Create Crouch Pose Menu");
-            go.transform.SetParent(parent, false);
-
-            ModularAvatarMenuItem item = Undo.AddComponent<ModularAvatarMenuItem>(go);
-            item.Control = new VRCExpressionsMenu.Control
-            {
-                name = displayName,
-                icon = pose.Entry.icon,
-                type = VRCExpressionsMenu.Control.ControlType.Toggle,
-                parameter = new VRCExpressionsMenu.Control.Parameter { name = CrouchPoseParameter },
-                value = pose.Value,
-                subParameters = new VRCExpressionsMenu.Control.Parameter[0],
-                labels = new VRCExpressionsMenu.Control.Label[0],
-            };
-
-            // 既存のしゃがみ項目と同じ扱いにする。automaticValue を切らないと
-            // せっかく割り当てた枠番号を Modular Avatar が振り直してしまう
-            item.MenuSource = SubmenuSource.Children;
-            item.isSynced = true;
-            item.isSaved = true;
-            item.isDefault = false;
-            item.automaticValue = false;
-
-            EditorUtility.SetDirty(item);
-        }
-
-        private static Transform FindDescendant(Transform root, string name)
-        {
-            foreach (Transform child in root)
-            {
-                if (child.name == name) return child;
-
-                Transform found = FindDescendant(child, name);
-                if (found != null) return found;
+                item.isDefault = SupineCrouchValues.Approximately(item.Control.value, value);
+                EditorUtility.SetDirty(item);
             }
-            return null;
+        }
+
+        private static void RemoveMenu(GameObject maPrefabInstance)
+        {
+            Transform menu = MenuItemUtility.FindDescendant(maPrefabInstance.transform, CrouchMenuName);
+            if (menu == null) return;
+
+            Undo.DestroyObjectImmediate(menu.gameObject);
+        }
+
+        private static void RemoveParameter(GameObject maPrefabInstance)
+        {
+            ModularAvatarParameters parameters = FindParameters(maPrefabInstance);
+            if (parameters == null) return;
+
+            for (int i = parameters.parameters.Count - 1; i >= 0; i--)
+            {
+                if (parameters.parameters[i].nameOrPrefix != CrouchPoseParameter) continue;
+
+                Undo.RecordObject(parameters, "Remove Crouch Pose Parameter");
+                parameters.parameters.RemoveAt(i);
+                EditorUtility.SetDirty(parameters);
+            }
+        }
+
+        private static ModularAvatarParameters FindParameters(GameObject maPrefabInstance)
+        {
+            return maPrefabInstance == null
+                ? null
+                : maPrefabInstance.GetComponentInChildren<ModularAvatarParameters>(true);
         }
     }
 }

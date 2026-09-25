@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEngine;
 using UnityEditor.Animations;
 
 namespace Supine.Utilities
@@ -6,6 +7,14 @@ namespace Supine.Utilities
     /// <summary>
     /// AnimatorController の中身を扱うユーティリティ（UnityEngine.AnimatorUtility との衝突を避けた名前）
     /// </summary>
+    /// <summary>見つかったステートと、それを直接抱えているステートマシン</summary>
+    internal sealed class StateLocation
+    {
+        public AnimatorStateMachine Machine;
+        public AnimatorState State;
+        public int LayerIndex;
+    }
+
     internal static class AnimatorStateUtility
     {
         public static AnimatorState FindAnimatorStateByName(ChildAnimatorState[] states, string name)
@@ -16,6 +25,47 @@ namespace Supine.Utilities
                 {
                     return childState.state;
                 }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// コントローラからステートを名前で探す。サブステートマシンの中も見る。
+        /// 同名が複数あるときは、レイヤー順・深さ優先で最初に見つかったものを返す。
+        /// </summary>
+        /// <param name="layerIndex">0以上ならそのレイヤーの中だけを見る</param>
+        /// <returns>見つからなければ null</returns>
+        public static StateLocation FindState(AnimatorController controller, string name, int layerIndex = -1)
+        {
+            if (controller == null) return null;
+
+            AnimatorControllerLayer[] layers = controller.layers;
+            for (int i = 0; i < layers.Length; i++)
+            {
+                if (layerIndex >= 0 && i != layerIndex) continue;
+
+                StateLocation found = FindState(layers[i].stateMachine, name, i);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        private static StateLocation FindState(AnimatorStateMachine machine, string name, int layerIndex)
+        {
+            if (machine == null) return null;
+
+            foreach (ChildAnimatorState child in machine.states)
+            {
+                if (child.state != null && child.state.name == name)
+                {
+                    return new StateLocation { Machine = machine, State = child.state, LayerIndex = layerIndex };
+                }
+            }
+
+            foreach (ChildAnimatorStateMachine child in machine.stateMachines)
+            {
+                StateLocation found = FindState(child.stateMachine, name, layerIndex);
+                if (found != null) return found;
             }
             return null;
         }
@@ -64,6 +114,29 @@ namespace Supine.Utilities
                 }
             }
             return destinations;
+        }
+
+        /// <summary>
+        /// ステートマシンの直下にあるノードが画面上で占める範囲。
+        /// Entry / Exit / AnyState も場所を取るので含める。サブステートマシンの中までは見ない。
+        /// </summary>
+        public static void GetNodeBounds(AnimatorStateMachine stateMachine, out Vector3 min, out Vector3 max)
+        {
+            min = Vector3.Min(stateMachine.anyStatePosition,
+                Vector3.Min(stateMachine.entryPosition, stateMachine.exitPosition));
+            max = Vector3.Max(stateMachine.anyStatePosition,
+                Vector3.Max(stateMachine.entryPosition, stateMachine.exitPosition));
+
+            foreach (ChildAnimatorState child in stateMachine.states)
+            {
+                min = Vector3.Min(min, child.position);
+                max = Vector3.Max(max, child.position);
+            }
+            foreach (ChildAnimatorStateMachine child in stateMachine.stateMachines)
+            {
+                min = Vector3.Min(min, child.position);
+                max = Vector3.Max(max, child.position);
+            }
         }
 
         /// <summary>

@@ -1,9 +1,8 @@
-using System.Collections.Generic;
+using System;
 using System.IO;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.Animations;
-using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 using VRC.SDK3.Avatars.Components;
 using Supine.Utilities;
 
@@ -12,7 +11,7 @@ namespace Supine
     /// <summary>
     /// ごろ寝システムの組込ウィンドウ
     /// </summary>
-    public sealed class SupineCombinerEditor : EditorWindow
+    public sealed partial class SupineCombinerEditor : EditorWindow
     {
         /// <summary>生成先フォルダ名の接頭辞</summary>
         private const string FolderLabel = "Supine";
@@ -29,35 +28,15 @@ namespace Supine
         private static readonly Vector2 WindowMinSize = new Vector2(420f, 500f);
 
         private GameObject _avatar;
+
+        /// <summary>_avatar の記述子。描画のたびに1回だけ引き直し、各欄はこれを使う</summary>
+        private VRCAvatarDescriptor _avatarDescriptor;
+
         private SupineCombiner _supineCombiner;
-
-        // 追加先アニメーターから読み取った内容。毎フレーム作り直すと重いのでキャッシュする
-        private AnimatorController _cachedAddTarget;
-        private string[] _addTargetStateNames = new string[0];
-        private bool _addTargetAlreadyCombined;
-        private string _cachedLieDownEntryStateName;
-        private List<string> _lieDownDestinationNames = new List<string>();
-
-        // 既存のしゃがみが入れ子のブレンドツリーかどうか。
-        // 毎フレーム走査すると重いので、判定に効く入力が変わったときだけ引き直す
-        private BlendTree _existingCrouchTree;
-        private string _existingCrouchSignature;
-
-        // 継承元アニメーターのステート一覧
-        private AnimatorController _cachedInheritSource;
-        private string[] _inheritSourceStateNames = new string[0];
 
         // アニメーターの中身が変わっていても参照が同じだと気付けないので、
         // ウィンドウに戻ってきたら読み直す。世代が食い違うキャッシュだけを作り直す
         private int _refreshGeneration = 1;
-
-        /// <summary>パックが足すしゃがみポーズ。選択肢を並べるためだけに持つ</summary>
-        private List<PosePack.ResolvedCrouchPose> _crouchPackPoses =
-            new List<PosePack.ResolvedCrouchPose>();
-
-        private int _crouchPackGeneration;
-        private int _addTargetGeneration;
-        private int _inheritSourceGeneration;
 
         private SupineLanguage _language = SupineLanguage.Japanese;
 
@@ -73,7 +52,7 @@ namespace Supine
         {
             get
             {
-                string version = PackageInfo.FindForAssembly(GetType().Assembly)?.version;
+                string version = SupinePackageVersion.Current;
                 if (string.IsNullOrEmpty(version))
                 {
                     Debug.LogWarning(
@@ -113,14 +92,24 @@ namespace Supine
 
             EditorGUILayout.Space();
 
+            // アバターと結合方法まわりは検証結果を左右するので、触ったらチェックからやり直させる。
+            // 検証していない構成のまま生成できてしまわないようにする
+            EditorGUI.BeginChangeCheck();
+
             DrawAvatarField(localizeDict);
 
             EditorGUILayout.Space();
 
             DrawCombineMode(localizeDict);
 
+            if (EditorGUI.EndChangeCheck())
+            {
+                _canCombine = false;
+            }
+
             EditorGUILayout.Space();
 
+            // 座り方と既定のしゃがみは検証に関わらないので、チェックをやり直させない
             DrawSittingPoses(localizeDict);
 
             EditorGUILayout.Space();
@@ -146,14 +135,11 @@ namespace Supine
             // アバター取得
             using (new GUILayout.HorizontalScope())
             {
-                EditorGUI.BeginChangeCheck();
                 _avatar = EditorGUILayout.ObjectField(localizeDict.avatar, _avatar, typeof(GameObject), true) as GameObject;
-
-                if (EditorGUI.EndChangeCheck())
-                {
-                    _canCombine = false;
-                }
             }
+
+            // 記述子は後から付け外しされうるので、キャッシュせず描画のたびに引く
+            _avatarDescriptor = _avatar != null ? _avatar.GetComponent<VRCAvatarDescriptor>() : null;
         }
 
         /// <summary>
@@ -163,17 +149,9 @@ namespace Supine
         /// </summary>
         private void DrawCombineMode(LocalizeDictionary localizeDict)
         {
-            EditorGUI.BeginChangeCheck();
-
             string[] modes = SupineCombineModeTable.GetLabels(localizeDict);
             _options.mode = SupineCombineModeTable.FromIndex(
                 EditorGUILayout.Popup(localizeDict.combine_mode, SupineCombineModeTable.IndexOf(_options.mode), modes));
-
-            if (EditorGUI.EndChangeCheck())
-            {
-                // 検証していない構成のまま生成できてしまわないようにする
-                _canCombine = false;
-            }
 
             EditorGUI.indentLevel++;
 
@@ -192,140 +170,10 @@ namespace Supine
         }
 
         /// <summary>
-        /// 既存のしゃがみポーズ切り替えとぶつかるときだけ、どちらを活かすか選ばせる。
-        ///
-        /// 他のツールも同じ手法（しゃがみステートに入れ子のブレンドツリーを差す）を
-        /// 使っていることがある。黙って上書きすると相手の切り替えを乗っ取るので、
-        /// 入れ子を見つけたときだけ選択肢を出す。
-        /// ぶつかっていないときに出しても意味が分からないだけなので、普段は隠す。
-        /// </summary>
-        private void DrawCrouchPoseConflict(LocalizeDictionary localizeDict)
-        {
-            RefreshExistingCrouchTree();
-            if (_existingCrouchTree == null) return;
-
-            EditorGUILayout.HelpBox(localizeDict.crouch_conflict, MessageType.Warning);
-
-            EditorGUI.BeginChangeCheck();
-            _options.keepExistingCrouchPose = EditorGUILayout.ToggleLeft(
-                localizeDict.crouch_keep_existing, _options.keepExistingCrouchPose);
-
-            if (EditorGUI.EndChangeCheck())
-            {
-                _canCombine = false;
-            }
-        }
-
-        /// <summary>
-        /// 既定にするしゃがみポーズ。CrouchPose パラメータの初期値になる。
-        /// 既存を優先する選択をしているときは、そもそも組み込まないので伏せる。
-        /// </summary>
-        private void DrawCrouchPose(LocalizeDictionary localizeDict)
-        {
-            if (_options.keepExistingCrouchPose) return;
-
-            RefreshCrouchPackPoses();
-
-            string[] builtIn = CrouchPoseTable.GetLabels(localizeDict);
-            string[] labels = new string[builtIn.Length + _crouchPackPoses.Count];
-            builtIn.CopyTo(labels, 0);
-
-            for (int i = 0; i < _crouchPackPoses.Count; i++)
-            {
-                labels[builtIn.Length + i] = _crouchPackPoses[i].Entry.ResolveDisplayName();
-            }
-
-            int selected = ResolveCrouchSelection(builtIn.Length);
-            int chosen = EditorGUILayout.Popup(localizeDict.crouch_pose, selected, labels);
-            if (chosen == selected) return;
-
-            if (chosen < builtIn.Length)
-            {
-                _options.defaultCrouchPose = CrouchPoseTable.FromIndex(chosen);
-                _options.defaultCrouchPoseKey = string.Empty;
-            }
-            else
-            {
-                PosePack.ResolvedCrouchPose pose = _crouchPackPoses[chosen - builtIn.Length];
-                _options.defaultCrouchPoseKey =
-                    PosePack.SupineCrouchInjector.MakeKey(pose.Pack, pose.Entry);
-            }
-        }
-
-        /// <summary>
-        /// 選択中の項目が選択肢の何番目かを引く。
-        ///
-        /// パックを外したあとは、覚えていた識別子がどれにも当たらなくなる。
-        /// その場合は組み込み側の選択へ黙って戻す。存在しないものを
-        /// 選んだままにすると、組み込んだときだけ違うポーズになる。
-        /// </summary>
-        private int ResolveCrouchSelection(int builtInCount)
-        {
-            if (!string.IsNullOrEmpty(_options.defaultCrouchPoseKey))
-            {
-                for (int i = 0; i < _crouchPackPoses.Count; i++)
-                {
-                    PosePack.ResolvedCrouchPose pose = _crouchPackPoses[i];
-                    if (PosePack.SupineCrouchInjector.MakeKey(pose.Pack, pose.Entry)
-                        != _options.defaultCrouchPoseKey) continue;
-
-                    return builtInCount + i;
-                }
-
-                _options.defaultCrouchPoseKey = string.Empty;
-            }
-
-            return CrouchPoseTable.IndexOf(_options.defaultCrouchPose);
-        }
-
-        /// <summary>
-        /// 選択肢の元になるパックの一覧を引き直す。
-        /// AssetDatabase を舐めるので、更新を押したときだけにする。
-        /// </summary>
-        private void RefreshCrouchPackPoses()
-        {
-            if (_crouchPackGeneration == _refreshGeneration) return;
-
-            _crouchPackGeneration = _refreshGeneration;
-            _crouchPackPoses = PosePack.SupinePosePackRegistry.ListCrouchEntries();
-        }
-
-        /// <summary>
-        /// 既存のしゃがみモーションの判定を引き直す。
-        /// コントローラ全体を走査するため、入力が変わっていなければ前回の結果を使う。
-        /// </summary>
-        private void RefreshExistingCrouchTree()
-        {
-            VRCAvatarDescriptor avatarDescriptor =
-                _avatar != null ? _avatar.GetComponent<VRCAvatarDescriptor>() : null;
-
-            string signature = string.Join("|", new[]
-                {
-                    _refreshGeneration.ToString(),
-                    avatarDescriptor != null ? avatarDescriptor.GetInstanceID().ToString() : "0",
-                    _options.mode.ToString(),
-                    _options.addTargetOverride != null
-                        ? _options.addTargetOverride.GetInstanceID().ToString()
-                        : "0",
-                    _options.mode == SupineCombineMode.Add
-                        ? _options.entryStateName
-                        : (_options.ShouldInherit ? _options.inheritCrouchingStateName : "-")
-                });
-
-            if (signature == _existingCrouchSignature) return;
-
-            _existingCrouchSignature = signature;
-            _existingCrouchTree =
-                PosePack.SupineCrouchInjector.FindExistingNestedTree(avatarDescriptor, _options);
-        }
-
-        /// <summary>
         /// 従来モードのオプション。継承とジャンプはごろ寝システムのアニメーターを編集するためのもの。
         /// </summary>
         private void DrawStandardOptions(LocalizeDictionary localizeDict)
         {
-            EditorGUI.BeginChangeCheck();
-
             // 元の立ち、しゃがみ、伏せアニメーションを継承するか
             _options.shouldInheritOriginalAnimation = EditorGUILayout.ToggleLeft(
                 localizeDict.inherit_original, _options.shouldInheritOriginalAnimation);
@@ -347,44 +195,6 @@ namespace Supine
                 }
                 EditorGUI.indentLevel--;
             }
-
-            if (EditorGUI.EndChangeCheck())
-            {
-                _canCombine = false;
-            }
-        }
-
-        /// <summary>
-        /// どの既存ステートからモーションを引き継ぐかの選択。
-        /// 名前が一致するものを初期選択にし、一致しなければユーザーに選ばせる。
-        /// </summary>
-        private void DrawInheritSourceStates(LocalizeDictionary localizeDict)
-        {
-            VRCAvatarDescriptor avatarDescriptor =
-                _avatar != null ? _avatar.GetComponent<VRCAvatarDescriptor>() : null;
-            RefreshInheritSourceStates(BaseAnimatorResolver.FindBaseLayerController(avatarDescriptor));
-
-            EditorGUI.indentLevel++;
-
-            using (new EditorGUI.DisabledGroupScope(
-                !_options.shouldInheritOriginalAnimation || _inheritSourceStateNames.Length == 0))
-            {
-                string[] display = BuildDisplayNames(_inheritSourceStateNames, localizeDict);
-
-                foreach (string templateStateName in InheritedStateTable.TemplateStateNames)
-                {
-                    string picked = DrawStateNamePopup(
-                        InheritedStateTable.GetLabel(templateStateName, localizeDict),
-                        InheritedStateTable.GetSourceStateName(_options, templateStateName),
-                        _inheritSourceStateNames, display);
-
-                    InheritedStateTable.SetSourceStateName(ref _options, templateStateName, picked);
-                }
-
-                EditorGUILayout.HelpBox(localizeDict.inherit_state_help, MessageType.Info);
-            }
-
-            EditorGUI.indentLevel--;
         }
 
         /// <summary>
@@ -392,275 +202,13 @@ namespace Supine
         /// </summary>
         private void DrawAddOptions(LocalizeDictionary localizeDict)
         {
-            EditorGUI.BeginChangeCheck();
-
             _options.addTargetOverride = EditorGUILayout.ObjectField(
                 localizeDict.add_target, _options.addTargetOverride,
                 typeof(AnimatorController), false) as AnimatorController;
 
             EditorGUILayout.LabelField(localizeDict.add_target_auto, EditorStyles.miniLabel);
 
-            if (EditorGUI.EndChangeCheck())
-            {
-                _canCombine = false;
-            }
-
             DrawAddTargetStates(localizeDict);
-        }
-
-        /// <summary>
-        /// 継承元アニメーターのステート名一覧を作り直す。名前が一致するものを初期選択にする。
-        /// </summary>
-        private void RefreshInheritSourceStates(AnimatorController source)
-        {
-            bool sourceChanged = source != _cachedInheritSource;
-            if (!sourceChanged && _inheritSourceGeneration == _refreshGeneration) return;
-
-            _inheritSourceGeneration = _refreshGeneration;
-            _cachedInheritSource = source;
-            _inheritSourceStateNames = BuildStateNames(source);
-
-            // 名前一致だけだと、ステート名を変えているアバターで軒並み「なし」になる。
-            // 追加モードと同じく、遷移の構造からも推測する
-            Dictionary<string, string> inferred =
-                SupineLocomotionAdder.InferInheritSourceStateNames(source);
-
-            foreach (string templateStateName in InheritedStateTable.TemplateStateNames)
-            {
-                string current = InheritedStateTable.GetSourceStateName(_options, templateStateName);
-
-                // 中身だけ変わった場合は、選んでいたステートが消えていたときだけ選び直す
-                if (!sourceChanged && current != null &&
-                    (current.Length == 0 || DisplayIndexOf(_inheritSourceStateNames, current) > 0)) continue;
-
-                // 推測できたものを初期選択に、できなければ「なし」（＝ごろ寝システムのアニメーション）
-                InheritedStateTable.SetSourceStateName(
-                    ref _options, templateStateName,
-                    AutoSelectStateName(
-                        _inheritSourceStateNames,
-                        inferred.TryGetValue(templateStateName, out string guess) ? guess : templateStateName));
-            }
-        }
-
-        /// <summary>
-        /// 追加先の解決結果と、どのステートをごろ寝システムに使うかの選択。
-        ///
-        /// 既成のアニメーターはステート名を変えていることが多く、名前一致だけでは拾えない。
-        /// 追加先のステート名を一覧で出し、名前が一致するものを初期選択にしたうえで、
-        /// 一致しない場合はユーザーが選び直せるようにする。
-        /// </summary>
-        private void DrawAddTargetStates(LocalizeDictionary localizeDict)
-        {
-            VRCAvatarDescriptor avatarDescriptor =
-                _avatar != null ? _avatar.GetComponent<VRCAvatarDescriptor>() : null;
-            BaseAnimatorResolution resolution =
-                BaseAnimatorResolver.Resolve(avatarDescriptor, _options.addTargetOverride);
-
-            DrawAddTargetHelp(localizeDict, avatarDescriptor, resolution);
-            RefreshAddTargetStates(resolution.controller);
-
-            EditorGUI.indentLevel++;
-            EditorGUI.BeginChangeCheck();
-
-            using (new EditorGUI.DisabledGroupScope(_addTargetStateNames.Length == 0))
-            {
-                string[] display = BuildDisplayNames(_addTargetStateNames, localizeDict);
-
-                string previousEntry = _options.entryStateName;
-                _options.entryStateName = DrawStateNamePopup(
-                    localizeDict.entry_state, _options.entryStateName, _addTargetStateNames, display);
-
-                // 入口が変わったら、そこから伏せへ降りる先を推測して選び直す
-                if (_options.entryStateName != previousEntry)
-                {
-                    _options.proneStateName =
-                        InferProneStateName(resolution.controller, _options.entryStateName);
-                }
-
-                _options.proneStateName = DrawStateNamePopup(
-                    localizeDict.prone_state, _options.proneStateName, _addTargetStateNames, display);
-
-                EditorGUILayout.HelpBox(localizeDict.add_state_help, MessageType.Info);
-
-                RefreshLieDownDestinations(resolution.controller, false);
-
-                if (SupineLocomotionAdder.HasConflictingLieDownDestination(
-                        _lieDownDestinationNames, _options.proneStateName))
-                {
-                    EditorGUILayout.HelpBox(localizeDict.add_state_conflict, MessageType.Warning);
-                }
-
-                if (_addTargetAlreadyCombined)
-                {
-                    EditorGUILayout.HelpBox(localizeDict.add_state_already_combined, MessageType.Warning);
-                }
-            }
-
-            if (EditorGUI.EndChangeCheck())
-            {
-                _canCombine = false;
-            }
-
-            EditorGUI.indentLevel--;
-        }
-
-        /// <summary>
-        /// 追加先のステート名一覧を作り直す。名前が一致するものを初期選択にする。
-        /// 一致しなければ「なし」にして、ユーザーに選ばせる。
-        /// </summary>
-        private void RefreshAddTargetStates(AnimatorController target)
-        {
-            bool targetChanged = target != _cachedAddTarget;
-            if (!targetChanged && _addTargetGeneration == _refreshGeneration) return;
-
-            _addTargetGeneration = _refreshGeneration;
-            _cachedAddTarget = target;
-            _addTargetStateNames = BuildStateNames(target);
-            _addTargetAlreadyCombined =
-                SupineLocomotionAdder.IsSupineCombined(Template.LoadController(), target);
-
-            // 追加先が変わったなら選び直す。中身だけ変わった場合は、
-            // 選んでいたステートが消えていたときだけ選び直して、手動の指定を無駄に壊さない
-            if (targetChanged || !IsSelectableStateName(_options.entryStateName))
-            {
-                _options.entryStateName = AutoSelectStateName(
-                    _addTargetStateNames, SupineLocomotionAdder.InferEntryStateName(target));
-            }
-            if (targetChanged || !IsSelectableStateName(_options.proneStateName))
-            {
-                _options.proneStateName = InferProneStateName(target, _options.entryStateName);
-            }
-
-            RefreshLieDownDestinations(target, true);
-        }
-
-        /// <summary>一覧から選べる状態か。「なし」も選択として有効</summary>
-        private bool IsSelectableStateName(string stateName)
-        {
-            return stateName != null && (stateName.Length == 0 ||
-                DisplayIndexOf(_addTargetStateNames, stateName) > 0);
-        }
-
-        /// <summary>
-        /// 入口ステートから降りる先を控え直す。競合の判定を毎フレーム走査しないためのキャッシュ。
-        /// </summary>
-        private void RefreshLieDownDestinations(AnimatorController target, bool force)
-        {
-            if (!force && _options.entryStateName == _cachedLieDownEntryStateName) return;
-
-            _cachedLieDownEntryStateName = _options.entryStateName;
-            _lieDownDestinationNames = SupineLocomotionAdder.CollectLieDownDestinationNames(
-                Template.LoadController(), target, _options.entryStateName);
-        }
-
-        /// <summary>
-        /// 伏せ状態にあたるステートを推測する。
-        ///
-        /// 入口ステートから Upright less than で降りる先があれば、それがそのアニメーターの伏せ状態。
-        /// ステート名を変えていても拾えるので、名前一致より優先する。
-        /// </summary>
-        private string InferProneStateName(AnimatorController target, string entryStateName)
-        {
-            List<AnimatorState> destinations =
-                SupineLocomotionAdder.CollectLieDownDestinations(target, entryStateName);
-
-            if (destinations.Count > 0) return destinations[0].name;
-
-            return AutoSelectStateName(_addTargetStateNames, SupineLocomotionAdder.ProneStateName);
-        }
-
-        /// <summary>
-        /// ステート名のPopupを1つ描く。
-        /// </summary>
-        /// <returns>選ばれたステート名。「なし」なら空文字</returns>
-        private static string DrawStateNamePopup(
-            string label, string current, string[] stateNames, string[] displayNames)
-        {
-            int index = DisplayIndexOf(stateNames, current);
-            int picked = EditorGUILayout.Popup(label, index, displayNames);
-
-            return picked == index ? current : StateNameAtDisplayIndex(stateNames, picked);
-        }
-
-        private static string[] BuildStateNames(AnimatorController controller)
-        {
-            if (controller == null || controller.layers.Length == 0 ||
-                controller.layers[0].stateMachine == null)
-            {
-                return new string[0];
-            }
-
-            // 追加処理と同じ索引から作る。ここで選んだ名前がそのまま向こうで引ける
-            Dictionary<string, AnimatorState> index =
-                AnimatorStateUtility.BuildStateIndex(controller.layers[0].stateMachine);
-
-            string[] names = new string[index.Count];
-            index.Keys.CopyTo(names, 0);
-            return names;
-        }
-
-        /// <summary>
-        /// Popupに出す並び。先頭に「なし」を足す。
-        /// 表示名は言語で変わるので、キャッシュせず毎回組み立てる。
-        /// </summary>
-        private static string[] BuildDisplayNames(string[] stateNames, LocalizeDictionary localizeDict)
-        {
-            string[] displayNames = new string[stateNames.Length + 1];
-            displayNames[0] = localizeDict.state_none;
-            stateNames.CopyTo(displayNames, 1);
-            return displayNames;
-        }
-
-        /// <summary>名前が一覧にあればそれを、無ければ「なし」を初期選択にする</summary>
-        private static string AutoSelectStateName(string[] stateNames, string name)
-        {
-            return DisplayIndexOf(stateNames, name) > 0 ? name : string.Empty;
-        }
-
-        /// <summary>Popupでの位置。空文字は「なし」で先頭、未指定(null)は空欄の-1</summary>
-        private static int DisplayIndexOf(string[] stateNames, string name)
-        {
-            if (name == null) return -1;
-            if (name.Length == 0) return 0;
-
-            for (int i = 0; i < stateNames.Length; i++)
-            {
-                if (stateNames[i] == name) return i + 1;
-            }
-            return -1;
-        }
-
-        private static string StateNameAtDisplayIndex(string[] stateNames, int displayIndex)
-        {
-            if (displayIndex <= 0 || displayIndex > stateNames.Length) return string.Empty;
-            return stateNames[displayIndex - 1];
-        }
-
-        /// <summary>
-        /// 自動取得の結果を実名で見せる。手動指定時はフィールドが答えなので出さない。
-        /// </summary>
-        private void DrawAddTargetHelp(
-            LocalizeDictionary localizeDict, VRCAvatarDescriptor avatarDescriptor, BaseAnimatorResolution resolution)
-        {
-            if (_options.addTargetOverride != null) return;
-            if (avatarDescriptor == null) return;
-
-            switch (resolution.source)
-            {
-                case BaseAnimatorSource.AvatarDescriptor:
-                    EditorGUILayout.HelpBox(
-                        string.Format(localizeDict.add_target_resolved, resolution.controller.name),
-                        MessageType.None);
-                    break;
-
-                case BaseAnimatorSource.VrcDefault:
-                    EditorGUILayout.HelpBox(localizeDict.add_target_vrc_default, MessageType.Info);
-                    break;
-
-                default:
-                    EditorGUILayout.HelpBox(localizeDict.check_failure_add_target_message, MessageType.Warning);
-                    break;
-            }
         }
 
         private void DrawSittingPoses(LocalizeDictionary localizeDict)
@@ -751,46 +299,84 @@ namespace Supine
             _canCombine = false;
         }
 
+        /// <summary>
+        /// EditorPrefs に残す設定。読み書きの両方をこの表から作るので、片方だけ足し忘れることは無い。
+        ///
+        /// 追加先アニメーターは保存しない。
+        /// EditorPrefsはマシン全体で共有されるため、別プロジェクトのGUIDが幽霊参照として残ってしまう。
+        /// アバターを保存していないのと同じ方針。
+        /// </summary>
+        private PrefEntry[] Prefs => new[]
+        {
+            PrefEntry.Int("language", () => (int)_language, v => _language = (SupineLanguage)v),
+            PrefEntry.Int("combineMode", () => (int)_options.mode, v => _options.mode = (SupineCombineMode)v),
+            PrefEntry.Bool("inheritOriginal",
+                () => _options.shouldInheritOriginalAnimation, v => _options.shouldInheritOriginalAnimation = v),
+            PrefEntry.Bool("keepExistingCrouchPose",
+                () => _options.keepExistingCrouchPose, v => _options.keepExistingCrouchPose = v),
+            PrefEntry.Bool("disableJumpMotion",
+                () => _options.disableJumpMotion, v => _options.disableJumpMotion = v),
+            PrefEntry.Bool("enableJumpAtDesktop",
+                () => _options.enableJumpAtDesktop, v => _options.enableJumpAtDesktop = v),
+            PrefEntry.Int("defaultCrouchPose",
+                () => (int)_options.defaultCrouchPose, v => _options.defaultCrouchPose = (CrouchPose)v),
+            PrefEntry.Text("defaultCrouchPoseKey",
+                () => _options.defaultCrouchPoseKey, v => _options.defaultCrouchPoseKey = v),
+            PrefEntry.Int("sittingPose1",
+                () => (int)_options.sittingPose1, v => _options.sittingPose1 = (SittingPose)v),
+            PrefEntry.Int("sittingPose2",
+                () => (int)_options.sittingPose2, v => _options.sittingPose2 = (SittingPose)v),
+        };
+
         private void LoadPrefs()
         {
-            _language = (SupineLanguage)EditorPrefs.GetInt(PrefsKey("language"), (int)_language);
-            _options.mode = (SupineCombineMode)EditorPrefs.GetInt(PrefsKey("combineMode"), (int)_options.mode);
-            _options.shouldInheritOriginalAnimation =
-                EditorPrefs.GetBool(PrefsKey("inheritOriginal"), _options.shouldInheritOriginalAnimation);
-            _options.keepExistingCrouchPose =
-                EditorPrefs.GetBool(PrefsKey("keepExistingCrouchPose"), _options.keepExistingCrouchPose);
-            _options.disableJumpMotion   = EditorPrefs.GetBool(PrefsKey("disableJumpMotion"), _options.disableJumpMotion);
-            _options.enableJumpAtDesktop = EditorPrefs.GetBool(PrefsKey("enableJumpAtDesktop"), _options.enableJumpAtDesktop);
-            _options.defaultCrouchPose =
-                (CrouchPose)EditorPrefs.GetInt(PrefsKey("defaultCrouchPose"), (int)_options.defaultCrouchPose);
-            _options.defaultCrouchPoseKey =
-                EditorPrefs.GetString(PrefsKey("defaultCrouchPoseKey"), _options.defaultCrouchPoseKey);
-            _options.sittingPose1 = (SittingPose)EditorPrefs.GetInt(PrefsKey("sittingPose1"), (int)_options.sittingPose1);
-            _options.sittingPose2 = (SittingPose)EditorPrefs.GetInt(PrefsKey("sittingPose2"), (int)_options.sittingPose2);
+            foreach (PrefEntry entry in Prefs) entry.Load(PrefsKeyPrefix);
         }
 
         private void SavePrefs()
         {
-            // 追加先アニメーターは保存しない。
-            // EditorPrefsはマシン全体で共有されるため、別プロジェクトのGUIDが幽霊参照として残ってしまう。
-            // アバターを保存していないのと同じ方針。
-            EditorPrefs.SetInt(PrefsKey("language"), (int)_language);
-            EditorPrefs.SetInt(PrefsKey("combineMode"), (int)_options.mode);
-            EditorPrefs.SetBool(PrefsKey("inheritOriginal"), _options.shouldInheritOriginalAnimation);
-            EditorPrefs.SetBool(PrefsKey("keepExistingCrouchPose"), _options.keepExistingCrouchPose);
-            EditorPrefs.SetBool(PrefsKey("disableJumpMotion"), _options.disableJumpMotion);
-            EditorPrefs.SetBool(PrefsKey("enableJumpAtDesktop"), _options.enableJumpAtDesktop);
-            EditorPrefs.SetInt(PrefsKey("defaultCrouchPose"), (int)_options.defaultCrouchPose);
-            EditorPrefs.SetString(PrefsKey("defaultCrouchPoseKey"), _options.defaultCrouchPoseKey);
-            EditorPrefs.SetInt(PrefsKey("sittingPose1"), (int)_options.sittingPose1);
-            EditorPrefs.SetInt(PrefsKey("sittingPose2"), (int)_options.sittingPose2);
+            foreach (PrefEntry entry in Prefs) entry.Save(PrefsKeyPrefix);
         }
 
         private static SupineTemplate Template => JsonHelper.GetGuidList().template;
 
-        private static string PrefsKey(string name)
+        /// <summary>EditorPrefs の1項目。今の値を既定値にして読むので、未保存なら何も変わらない</summary>
+        private sealed class PrefEntry
         {
-            return PrefsKeyPrefix + "." + name;
+            private readonly string _name;
+            private readonly Action<string> _load;
+            private readonly Action<string> _save;
+
+            private PrefEntry(string name, Action<string> load, Action<string> save)
+            {
+                _name = name;
+                _load = load;
+                _save = save;
+            }
+
+            public void Load(string prefix) => _load(prefix + "." + _name);
+            public void Save(string prefix) => _save(prefix + "." + _name);
+
+            public static PrefEntry Int(string name, Func<int> get, Action<int> set)
+            {
+                return new PrefEntry(name,
+                    key => set(EditorPrefs.GetInt(key, get())),
+                    key => EditorPrefs.SetInt(key, get()));
+            }
+
+            public static PrefEntry Bool(string name, Func<bool> get, Action<bool> set)
+            {
+                return new PrefEntry(name,
+                    key => set(EditorPrefs.GetBool(key, get())),
+                    key => EditorPrefs.SetBool(key, get()));
+            }
+
+            public static PrefEntry Text(string name, Func<string> get, Action<string> set)
+            {
+                return new PrefEntry(name,
+                    key => set(EditorPrefs.GetString(key, get())),
+                    key => EditorPrefs.SetString(key, get()));
+            }
         }
     }
 }
