@@ -56,7 +56,7 @@ namespace Supine.PosePack
         /// <param name="warnings">利用者に見せる警告の追記先</param>
         public static List<ResolvedPose> Resolve(AnimatorController controller, List<string> warnings)
         {
-            List<SupinePosePack> packs = CollectPacks();
+            List<SupinePosePack> packs = CollectPacks(warnings);
             List<ResolvedPose> resolved = new List<ResolvedPose>();
             if (packs.Count == 0) return resolved;
 
@@ -111,7 +111,7 @@ namespace Supine.PosePack
         /// <param name="template">テンプレートの根ツリー。埋まっている番号をここから読む</param>
         public static List<ResolvedCrouchPose> ResolveCrouch(BlendTree template, List<string> warnings)
         {
-            List<SupinePosePack> packs = CollectPacks();
+            List<SupinePosePack> packs = CollectPacks(warnings);
             List<ResolvedCrouchPose> resolved = new List<ResolvedCrouchPose>();
             if (packs.Count == 0) return resolved;
 
@@ -170,7 +170,7 @@ namespace Supine.PosePack
             HashSet<string> usedIds = new HashSet<string>();
             List<string> ignored = new List<string>();
 
-            foreach (SupinePosePack pack in CollectPacks())
+            foreach (SupinePosePack pack in CollectPacks(ignored))
             {
                 if (pack.crouchPoses == null) continue;
 
@@ -265,15 +265,28 @@ namespace Supine.PosePack
         /// 並びが揺れると採番も揺れる。メニュー項目は isSaved のため、
         /// 採番がずれると前回保存された選択が別のポーズを指してしまう。
         /// </summary>
-        private static List<SupinePosePack> CollectPacks()
+        private static List<SupinePosePack> CollectPacks(List<string> warnings)
         {
             List<SupinePosePack> packs = new List<SupinePosePack>();
+            string currentVersion = SupinePackageVersion.Current;
 
             foreach (string guid in AssetDatabase.FindAssets("t:SupinePosePack"))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 SupinePosePack pack = AssetDatabase.LoadAssetAtPath<SupinePosePack>(path);
-                if (pack != null) packs.Add(pack);
+                if (pack == null) continue;
+
+                // 仕組みが変わったあとで古い本体に新しいパックを入れると、黙って壊れる。
+                // 組込の時点で気付けるよう、足りなければ丸ごと外して知らせる
+                if (!SupinePackageVersion.IsAtLeast(currentVersion, pack.minimumSupineVersion))
+                {
+                    warnings.Add(
+                        "Pack '" + pack.ResolvePackId() + "' requires Supine " + pack.minimumSupineVersion +
+                        " or later, but " + currentVersion + " is installed. The pack was skipped.");
+                    continue;
+                }
+
+                packs.Add(pack);
             }
 
             packs.Sort(ComparePacks);

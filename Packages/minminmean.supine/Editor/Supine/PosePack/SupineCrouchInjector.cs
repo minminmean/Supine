@@ -294,8 +294,7 @@ namespace Supine.PosePack
                 }
             }
 
-            // 組み込みのぶんは従来どおりツリーから引く。
-            // 数値を別に持つと、ツリーの並びを変えたときに黙ってずれる
+            // 組み込みのぶんは従来どおりツリーから引く
             int index = CrouchPoseTable.ChildIndex(options.defaultCrouchPose);
             if (index < 0 || index >= root.children.Length) index = 0;
 

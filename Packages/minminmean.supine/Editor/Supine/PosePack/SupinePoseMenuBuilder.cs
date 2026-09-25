@@ -245,10 +245,6 @@ namespace Supine.PosePack
         }
 
         /// <summary>
-        /// 既存のメニュー項目をそのまま複製して足す。
-        /// 作り直すとアイコンや同期の設定を書き写すことになり、元を直したときにずれる。
-        /// </summary>
-        /// <summary>
         /// 姿勢の微調整を回すラジアル。
         /// ポーズのクリップに2つ以上キーがあると、その間をこの軸でスクラブできる。
         /// </summary>
@@ -286,6 +282,10 @@ namespace Supine.PosePack
             EditorUtility.SetDirty(item);
         }
 
+        /// <summary>
+        /// 既存のメニュー項目をそのまま複製して足す。
+        /// 作り直すとアイコンや同期の設定を書き写すことになり、元を直したときにずれる。
+        /// </summary>
         private static void CopyItem(GameObject template, Transform parent)
         {
             GameObject copy = Object.Instantiate(template, parent);

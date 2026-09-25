@@ -3,7 +3,6 @@ using System.IO;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.Animations;
-using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 using VRC.SDK3.Avatars.Components;
 using Supine.Utilities;
 
@@ -73,7 +72,7 @@ namespace Supine
         {
             get
             {
-                string version = PackageInfo.FindForAssembly(GetType().Assembly)?.version;
+                string version = SupinePackageVersion.Current;
                 if (string.IsNullOrEmpty(version))
                 {
                     Debug.LogWarning(
