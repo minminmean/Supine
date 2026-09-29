@@ -44,6 +44,7 @@ namespace Supine
         /// <summary>
         /// 既定にするしゃがみポーズ。CrouchPose パラメータの初期値になる。
         /// 既存を優先する選択をしているときは、そもそも組み込まないので伏せる。
+        /// しゃがみ中に滑るかどうかも、しゃがみに手を入れる前提の設定なので一緒に伏せる。
         /// </summary>
         private void DrawCrouchPose(LocalizeDictionary localizeDict)
         {
@@ -62,6 +63,9 @@ namespace Supine
 
             int selected = ResolveCrouchSelection(builtIn.Length);
             int chosen = EditorGUILayout.Popup(localizeDict.crouch_pose, selected, labels);
+
+            _options.crouchSlide = EditorGUILayout.ToggleLeft(localizeDict.crouch_slide, _options.crouchSlide);
+
             if (chosen == selected) return;
 
             if (chosen < builtIn.Length)

@@ -28,6 +28,7 @@
     "crouch_air_chair_cross_m": "Air Chair Cross (M)",
     "crouch_conflict": "The existing crouching motion is a nested blend tree.\nAnother pose tool may already be driving the crouching pose.",
     "crouch_keep_existing": "Keep the existing crouch pose switching (do not add this tool's crouch poses)",
+    "crouch_slide": "Slide instead of walking while crouching (same as the sleeping poses)",
     "disable_jump_motion": "Disable jump and fall animations",
     "enable_jump_at_desktop": "Enable jump motion at desktop mode",
     "sit1": "Sitting pose 1",
@@ -51,5 +52,13 @@
     "ma_prefab_created": "Prefab creation successful",
     "ma_prefab_created_message": "Created the Modular Avatar Prefab.",
     "ma_prefab_create_failure": "Prefab creation failure",
-    "ma_prefab_create_failure_message": "Modular Avatar Prefab creation is failure.\nPlease check the console log."
+    "ma_prefab_create_failure_message": "Modular Avatar Prefab creation is failure.\nPlease check the console log.",
+    "record_header": "Settings at combine time",
+    "record_missing": "No combine settings were recorded.\nThis Prefab was combined with a version that did not record them.",
+    "record_version": "Version",
+    "record_combined_at": "Combined at",
+    "record_source_animator": "Source animator",
+    "record_add_target_auto": "Taken from the avatar's Base layer",
+    "record_pose_packs": "Pose packs",
+    "record_none": "None"
 }

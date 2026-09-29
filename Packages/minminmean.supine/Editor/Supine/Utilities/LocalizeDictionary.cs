@@ -40,6 +40,7 @@ namespace Supine.Utilities
         public string crouch_air_chair_cross_m;
         public string crouch_conflict;
         public string crouch_keep_existing;
+        public string crouch_slide;
         public string disable_jump_motion;
         public string enable_jump_at_desktop;
         public string sit1;
@@ -64,5 +65,13 @@ namespace Supine.Utilities
         public string ma_prefab_created_message;
         public string ma_prefab_create_failure;
         public string ma_prefab_create_failure_message;
+        public string record_header;
+        public string record_missing;
+        public string record_version;
+        public string record_combined_at;
+        public string record_source_animator;
+        public string record_add_target_auto;
+        public string record_pose_packs;
+        public string record_none;
     }
 }

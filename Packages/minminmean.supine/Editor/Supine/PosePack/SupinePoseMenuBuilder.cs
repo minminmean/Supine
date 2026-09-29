@@ -229,8 +229,9 @@ namespace Supine.PosePack
                 labels = new VRCExpressionsMenu.Control.Label[0],
             };
 
-            // 同期と保存は MA Parameters の宣言が優先されるが、紛らわしくないよう揃えておく（保存しない）
-            item.isSynced = true;
+            // 同期と保存は MA Parameters の宣言が優先されるが、紛らわしくないよう揃えておく。
+            // フラグは頭のトラッキングを切り替えるだけなので同期しない。軸の同期は MA Parameters 側で宣言している
+            item.isSynced = false;
             item.isSaved = false;
             item.isDefault = false;
             item.automaticValue = true;
