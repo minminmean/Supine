@@ -41,6 +41,13 @@ namespace Supine
             public const string EnableJumpAtDesktop = "EnableJumpAtDesktop";
         }
 
+        /// <summary>テンプレートのコントローラのレイヤー名</summary>
+        internal static class Layers
+        {
+            /// <summary>顔以外のトラッキングを戻すボタンを受けるレイヤー</summary>
+            public const string RestoreTracking = "Restore Tracking";
+        }
+
         /// <summary>SupineMA Prefab のメニュー項目名</summary>
         internal static class Menus
         {

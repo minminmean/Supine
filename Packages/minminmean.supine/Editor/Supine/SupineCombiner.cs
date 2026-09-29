@@ -122,6 +122,12 @@ namespace Supine
                 : PosePack.SupineCrouchInjector.Inject(
                     supineLocomotion, packs, stateNames, options, posePackWarnings);
 
+            // 滑りにするのは組込の後。組込が足したパックの枝も同じように滑らせるため
+            if (options.ShouldSlideCrouch)
+            {
+                PosePack.SupineCrouchSlide.Apply(supineLocomotion, stateNames, posePackWarnings);
+            }
+
             // コントローラへの変更はここまで。しゃがみの根ツリーも子アセットとして抱かせ終えている
             EditorUtility.SetDirty(supineLocomotion);
             AssetDatabase.SaveAssets();
@@ -150,6 +156,8 @@ namespace Supine
             EditorUtility.SetDirty(component);
 
             BuildMenus(maPrefabInstance, options, injectedPoses, crouch, posePackWarnings);
+
+            SupineCombineRecorder.Record(maPrefabInstance, _avatarDescriptor, options, injectedPoses, crouch);
 
             foreach (string warning in posePackWarnings)
             {

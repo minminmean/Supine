@@ -58,6 +58,14 @@ namespace Supine
         /// <summary>追加したステートを既存のステートに重ねないための余白</summary>
         private const float ClonePositionGap = 300f;
 
+        /// <summary>
+        /// 後の版で足した補助レイヤー。組込済みの判定には使わない。
+        /// 足す前の版で組み込んだアニメーターはこのレイヤーを持っていないため、
+        /// 判定に含めると「未組込」と見なされ、組み直しで前回の分が二重に残る。
+        /// </summary>
+        private static readonly HashSet<string> LayersAddedLater =
+            new HashSet<string> { SupineNames.Layers.RestoreTracking };
+
         /// <summary>Exit遷移どうしを突き合わせるための番兵</summary>
         private static readonly object ExitKey = new object();
 
@@ -106,6 +114,7 @@ namespace Supine
         ///
         /// ステート名は改名されうるが、補助レイヤーの構成はごろ寝システム固有なので、
         /// テンプレートのLocomotion以外のレイヤーが名前ごと揃っていれば組込済みと判定できる。
+        /// 後の版で足したレイヤーは、古い組込物が持っていないので数えない。
         /// </summary>
         internal static bool IsSupineCombined(AnimatorController template, AnimatorController target)
         {
@@ -118,11 +127,15 @@ namespace Supine
             }
 
             AnimatorControllerLayer[] templateLayers = template.layers;
+            bool compared = false;
             for (int i = 1; i < templateLayers.Length; i++)
             {
+                if (LayersAddedLater.Contains(templateLayers[i].name)) continue;
                 if (!targetLayerNames.Contains(templateLayers[i].name)) return false;
+
+                compared = true;
             }
-            return true;
+            return compared;
         }
 
         /// <summary>

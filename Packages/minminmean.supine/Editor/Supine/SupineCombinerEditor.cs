@@ -64,6 +64,12 @@ namespace Supine
             }
         }
 
+        /// <summary>
+        /// ウィンドウで選んでいる言語。インスペクタなど、ウィンドウの外で文言を出すときに揃えるため
+        /// </summary>
+        internal static SupineLanguage SavedLanguage =>
+            (SupineLanguage)EditorPrefs.GetInt(PrefsKeyPrefix + ".language", (int)SupineLanguage.Japanese);
+
         [MenuItem("Tools/MinMinMart/Supine Combiner")]
         private static void Create()
         {
@@ -322,6 +328,7 @@ namespace Supine
                 () => (int)_options.defaultCrouchPose, v => _options.defaultCrouchPose = (CrouchPose)v),
             PrefEntry.Text("defaultCrouchPoseKey",
                 () => _options.defaultCrouchPoseKey, v => _options.defaultCrouchPoseKey = v),
+            PrefEntry.Bool("crouchSlide", () => _options.crouchSlide, v => _options.crouchSlide = v),
             PrefEntry.Int("sittingPose1",
                 () => (int)_options.sittingPose1, v => _options.sittingPose1 = (SittingPose)v),
             PrefEntry.Int("sittingPose2",

@@ -64,6 +64,13 @@ namespace Supine
         /// </summary>
         public string defaultCrouchPoseKey;
 
+        /// <summary>
+        /// しゃがみ中の移動を、歩きではなく滑りにするか。
+        /// 寝ポーズと同じく、移動しても待機の姿勢のまま動く。
+        /// 既存のしゃがみ切り替えを優先するときは、しゃがみに手を入れないので効かない。
+        /// </summary>
+        public bool crouchSlide;
+
         public bool disableJumpMotion;
         public bool enableJumpAtDesktop;
 
@@ -84,6 +91,7 @@ namespace Supine
                     keepExistingCrouchPose        = false,
                     defaultCrouchPose             = CrouchPose.Default,
                     defaultCrouchPoseKey          = string.Empty,
+                    crouchSlide                   = false,
                     disableJumpMotion             = true,
                     enableJumpAtDesktop           = true,
                     sittingPose1                  = SittingPose.Petan,
@@ -100,6 +108,9 @@ namespace Supine
         /// 追加モードでは既存アニメーターのジャンプ・落下の挙動をそのまま残す。
         /// </summary>
         public bool ShouldApplyJumpOptions => mode == SupineCombineMode.Standard;
+
+        /// <summary>実際にしゃがみを滑りにするか</summary>
+        public bool ShouldSlideCrouch => crouchSlide && !keepExistingCrouchPose;
 
         /// <summary>実際に使う手動指定。従来モードでは無視する</summary>
         public AnimatorController EffectiveAddTargetOverride =>

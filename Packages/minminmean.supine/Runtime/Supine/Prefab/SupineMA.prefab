@@ -60,7 +60,7 @@ MonoBehaviour:
     labels: []
   MenuSource: 0
   menuSource_otherObjectChildren: {fileID: 0}
-  isSynced: 1
+  isSynced: 0
   isSaved: 1
   isDefault: 0
   automaticValue: 1
@@ -345,6 +345,26 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 142708bfabbdb1c002954da4c073039b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  record:
+    version: 
+    combinedAt: 
+    mode: 
+    sourceAnimator: {fileID: 0}
+    addTargetSpecified: 0
+    inheritOriginalAnimation: 0
+    inheritStandingState: 
+    inheritCrouchingState: 
+    inheritProneState: 
+    entryState: 
+    proneState: 
+    disableJumpMotion: 0
+    enableJumpAtDesktop: 0
+    sittingPose1: 
+    sittingPose2: 
+    keepExistingCrouchPose: 0
+    defaultCrouchPose: 
+    crouchSlide: 0
+    posePacks: []
 --- !u!1 &2703358847003626822
 GameObject:
   m_ObjectHideFlags: 0
@@ -1109,7 +1129,7 @@ MonoBehaviour:
     internalParameter: 0
     isPrefix: 0
     syncType: 3
-    localOnly: 0
+    localOnly: 1
     defaultValue: 1
     saved: 1
     hasExplicitDefaultValue: 1
@@ -1119,7 +1139,7 @@ MonoBehaviour:
     internalParameter: 0
     isPrefix: 0
     syncType: 3
-    localOnly: 0
+    localOnly: 1
     defaultValue: 1
     saved: 1
     hasExplicitDefaultValue: 1
@@ -1139,7 +1159,7 @@ MonoBehaviour:
     internalParameter: 0
     isPrefix: 0
     syncType: 3
-    localOnly: 0
+    localOnly: 1
     defaultValue: 0
     saved: 0
     hasExplicitDefaultValue: 1
@@ -1153,6 +1173,16 @@ MonoBehaviour:
     defaultValue: 0
     saved: 1
     hasExplicitDefaultValue: 1
+    m_overrideAnimatorDefaults: 0
+  - nameOrPrefix: VRCSupineRestoreTracking
+    remapTo: 
+    internalParameter: 0
+    isPrefix: 0
+    syncType: 3
+    localOnly: 1
+    defaultValue: 0
+    saved: 0
+    hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
 --- !u!114 &7926755146743231489
 MonoBehaviour:
@@ -1494,7 +1524,7 @@ MonoBehaviour:
     labels: []
   MenuSource: 0
   menuSource_otherObjectChildren: {fileID: 0}
-  isSynced: 1
+  isSynced: 0
   isSaved: 1
   isDefault: 0
   automaticValue: 1
@@ -1661,6 +1691,7 @@ Transform:
   m_Children:
   - {fileID: 6704785563652653739}
   - {fileID: 8265395552562939049}
+  - {fileID: 7131979001153330711}
   - {fileID: 5727908508214442230}
   - {fileID: 6621482011361605918}
   m_Father: {fileID: 6230647011717344626}
@@ -2006,6 +2037,71 @@ MonoBehaviour:
   menuSource_otherObjectChildren: {fileID: 0}
   isSynced: 1
   isSaved: 1
+  isDefault: 0
+  automaticValue: 1
+  label: 
+--- !u!1 &3294745763758969878
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7131979001153330711}
+  - component: {fileID: 4240749997465779150}
+  m_Layer: 0
+  m_Name: Restore Tracking
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7131979001153330711
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3294745763758969878}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3047880310582842383}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4240749997465779150
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3294745763758969878}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b29d45007c5493d926d2cd45a489529, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _modularAvatarVersionTag:
+    UpdatedAtVersion: 
+    MinimumVersion: 
+  Control:
+    name: Restore Tracking
+    icon: {fileID: 2800000, guid: 56d39fafe6ef0014e8178991a108e4ed, type: 3}
+    type: 101
+    parameter:
+      name: VRCSupineRestoreTracking
+    value: 1
+    style: 0
+    subMenu: {fileID: 0}
+    subParameters: []
+    labels: []
+  MenuSource: 0
+  menuSource_otherObjectChildren: {fileID: 0}
+  isSynced: 0
+  isSaved: 0
   isDefault: 0
   automaticValue: 1
   label: 
