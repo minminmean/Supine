@@ -31,6 +31,9 @@ namespace Supine
             /// <summary>調整中であることを示すフラグ。ラジアルを開いている間だけ立つ</summary>
             public const string PoseAdjusting = "VRCSupinePoseAdjusting";
 
+            /// <summary>ポーズが切り替わった瞬間だけ立つフラグ。ポーズのステートはこれで Pose Change へ抜ける</summary>
+            public const string PoseChanged = "PoseChanged";
+
             /// <summary>VRChat標準の Upright</summary>
             public const string Upright = "Upright";
 

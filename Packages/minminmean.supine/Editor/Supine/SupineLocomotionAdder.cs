@@ -55,6 +55,9 @@ namespace Supine
         /// </summary>
         internal const string LieDownConditionParameter = SupineNames.Parameters.Upright;
 
+        /// <summary>ポーズのステートが Pose Change へ抜ける条件。組み直し時にポーズを見分ける手掛かり</summary>
+        private const string PoseChangedParameter = SupineNames.Parameters.PoseChanged;
+
         /// <summary>追加したステートを既存のステートに重ねないための余白</summary>
         private const float ClonePositionGap = 300f;
 
@@ -428,10 +431,9 @@ namespace Supine
         /// パラメータは既存のレイヤーが参照している可能性があるため触らない
         /// （どのみち同じ名前・型で足し直される）。
         ///
-        /// 落とせるのはテンプレートに在るステート名だけなので、
-        /// 5.0より前のEX版で組み込んだものを組み直すような場合、EX固有のステートは消し残る。
-        /// 遷移は切れて到達不能になるだけなので、警告で伝えるに留めている
-        /// （テンプレートに無い名前まで落とすと、ユーザーが足したステートまで巻き込む）。
+        /// テンプレートに無いポーズのステート（ポーズパックや 5.0 より前の EX 版が足したもの）は、
+        /// 名前ではなく遷移の形で見分けて落とす。見分け方は <see cref="CollectPoseStates"/> を参照。
+        /// 形に当てはまらないステートは、ユーザーが足したものかもしれないので残す。
         ///
         /// 触るのは生成済みのコピーだけで、元のアニメーターのアセットには手を入れない。
         /// </summary>
@@ -444,8 +446,7 @@ namespace Supine
 
             _report.Warnings.Add(
                 "The target animator already contained Supine. " +
-                "Removed the previous Supine states and layers before adding it again. " +
-                "States the current template does not know about are left behind unused.");
+                "Removed the previous Supine states and layers before adding it again.");
         }
 
         private void RemoveSupineLayers()
@@ -477,19 +478,144 @@ namespace Supine
                 supineStateNames.Add(child.state.name);
             }
 
-            // RemoveStateが配列を組み替えるので、消す対象を先に控えてから消す
-            List<AnimatorState> removed = new List<AnimatorState>();
-            foreach (ChildAnimatorState child in _destinationRoot.states)
-            {
-                if (child.state == null) continue;
-                if (!supineStateNames.Contains(child.state.name)) continue;
+            HashSet<AnimatorState> poseStates = CollectPoseStates();
 
-                removed.Add(child.state);
+            // RemoveStateが配列を組み替えるので、消す対象を先に控えてから消す。
+            // ポーズのステートは入口ステートと同じ階層に足されるので、サブステートマシンの中も見る
+            List<KeyValuePair<AnimatorStateMachine, AnimatorState>> removed =
+                new List<KeyValuePair<AnimatorStateMachine, AnimatorState>>();
+
+            foreach (KeyValuePair<AnimatorStateMachine, AnimatorState> pair in EnumerateStates(_destinationRoot))
+            {
+                bool isTemplateState = pair.Key == _destinationRoot && supineStateNames.Contains(pair.Value.name);
+                if (!isTemplateState && !poseStates.Contains(pair.Value)) continue;
+
+                removed.Add(pair);
             }
 
-            foreach (AnimatorState state in removed)
+            foreach (KeyValuePair<AnimatorStateMachine, AnimatorState> pair in removed)
             {
-                _destinationRoot.RemoveState(state);
+                pair.Key.RemoveState(pair.Value);
+            }
+        }
+
+        /// <summary>
+        /// ごろ寝システムが足したポーズのステートを、遷移の形で見分ける。
+        ///
+        /// ポーズのステートは、テンプレートのものもパックが足したものも同じ形をしている。
+        /// 入口（しゃがみ）と Pose Change から VRCSupine == 値 で入り、PoseChanged で Pose Change へ抜ける。
+        /// ユーザーが自分で作るステートがこの2つを両方持つことはまず無い。
+        ///
+        /// ただし伏せも同じ形をしている（VRCSupine == 0 で入り、PoseChanged で抜ける）。
+        /// 伏せはアバター元々のステートなので、入る値が 0 のものは数えない。
+        /// パックのポーズは 0 を使えない（0 は伏せの予約）ので、これで取りこぼしは出ない。
+        /// 伏せの指定を前回から変えていても、値で見分けているので巻き込まない。
+        /// 念のため、立ち・しゃがみ・伏せにあたるステートは名前でも除いておく。
+        /// </summary>
+        private HashSet<AnimatorState> CollectPoseStates()
+        {
+            HashSet<AnimatorState> entered = new HashSet<AnimatorState>();
+
+            foreach (AnimatorStateMachine machine in EnumerateStateMachines(_destinationRoot))
+            {
+                CollectEnteredByPose(machine.anyStateTransitions, entered);
+
+                foreach (ChildAnimatorState child in machine.states)
+                {
+                    if (child.state == null) continue;
+                    CollectEnteredByPose(child.state.transitions, entered);
+                }
+            }
+
+            HashSet<string> anchors = CollectAnchorNames();
+            HashSet<AnimatorState> poseStates = new HashSet<AnimatorState>();
+
+            foreach (AnimatorState state in entered)
+            {
+                if (anchors.Contains(state.name)) continue;
+                if (!HasCondition(state.transitions, PoseChangedParameter, AnimatorConditionMode.If)) continue;
+
+                poseStates.Add(state);
+            }
+
+            return poseStates;
+        }
+
+        /// <summary>VRCSupine が 0 以外の値のときに入る遷移の、遷移先を集める</summary>
+        private static void CollectEnteredByPose(AnimatorStateTransition[] transitions, HashSet<AnimatorState> entered)
+        {
+            foreach (AnimatorStateTransition transition in transitions)
+            {
+                if (transition.destinationState == null) continue;
+
+                foreach (AnimatorCondition condition in transition.conditions)
+                {
+                    if (condition.parameter != SupineNames.Parameters.Pose) continue;
+                    if (condition.mode != AnimatorConditionMode.Equals) continue;
+                    if (Mathf.Approximately(condition.threshold, 0f)) continue;
+
+                    entered.Add(transition.destinationState);
+                    break;
+                }
+            }
+        }
+
+        private static bool HasCondition(
+            AnimatorStateTransition[] transitions, string parameter, AnimatorConditionMode mode)
+        {
+            foreach (AnimatorStateTransition transition in transitions)
+            {
+                foreach (AnimatorCondition condition in transition.conditions)
+                {
+                    if (condition.parameter == parameter && condition.mode == mode) return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>立ち・しゃがみ・伏せにあたるステートの名前。既定の名前と、今回の指定の両方</summary>
+        private HashSet<string> CollectAnchorNames()
+        {
+            HashSet<string> names = new HashSet<string>();
+
+            foreach (string templateName in new[] { StandingStateName, EntryStateName, ProneStateName })
+            {
+                names.Add(templateName);
+
+                if (TryResolveStateName(_stateNameOverrides, templateName, out string resolved))
+                {
+                    names.Add(resolved);
+                }
+            }
+
+            return names;
+        }
+
+        private static IEnumerable<AnimatorStateMachine> EnumerateStateMachines(AnimatorStateMachine root)
+        {
+            yield return root;
+
+            foreach (ChildAnimatorStateMachine child in root.stateMachines)
+            {
+                if (child.stateMachine == null) continue;
+
+                foreach (AnimatorStateMachine nested in EnumerateStateMachines(child.stateMachine))
+                {
+                    yield return nested;
+                }
+            }
+        }
+
+        private static IEnumerable<KeyValuePair<AnimatorStateMachine, AnimatorState>> EnumerateStates(
+            AnimatorStateMachine root)
+        {
+            foreach (AnimatorStateMachine machine in EnumerateStateMachines(root))
+            {
+                foreach (ChildAnimatorState child in machine.states)
+                {
+                    if (child.state == null) continue;
+                    yield return new KeyValuePair<AnimatorStateMachine, AnimatorState>(machine, child.state);
+                }
             }
         }
 

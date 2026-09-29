@@ -23,7 +23,7 @@ namespace Supine.PosePack
         private const string AdjustingParameter = SupineNames.Parameters.PoseAdjusting;
         private const string UprightParameter = SupineNames.Parameters.Upright;
         private const string LockPoseParameter = "VRCLockPose";
-        private const string PoseChangedParameter = "PoseChanged";
+        private const string PoseChangedParameter = SupineNames.Parameters.PoseChanged;
         private const string CurrentPoseParameter = "CurrentPose";
 
         private const string CrouchingStateName = SupineNames.States.Crouching;
