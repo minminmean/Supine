@@ -2,6 +2,8 @@
 
 # Change this to match your new package name
 !minminmean.supine*
+# EX is developed in its own repository; a local copy is kept here only for testing
+minminmean.supine-ex/
 minminmean.supine/Runtime/Supine/Generated
 minminmean.supine/Runtime/Supine/Generated.meta
 minminmean.supine/Editor/Supine/bin
